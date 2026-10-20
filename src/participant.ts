@@ -1,4 +1,4 @@
-import { hashCode, isExpired, normalizeCode } from './codes';
+import { hashCode, isExpired, normalizeCode, parseParticipantCode } from './codes';
 import { instructionText, parseConfig } from './config';
 import { buildExport } from './export';
 import { cryptoSeed, mulberry32 } from './rng';
@@ -344,6 +344,35 @@ export function mountParticipant(root: HTMLElement): () => void {
       return;
     }
     const hash = await hashCode(normalized);
+    const endpoint = await resolveEndpoint();
+    if (endpoint.scriptUrl) {
+      try {
+        const result = await getScript(endpoint.scriptUrl, { action: 'redeem', hash });
+        if (result.ok === true) {
+          configHolder.config = parseConfig(result.config);
+          if (languageChosen) configHolder.config.language = uiLanguage;
+          configHolder.number = Number(result.participantNumber);
+          configHolder.hash = hash;
+          phase = 'instruction';
+          codeError = '';
+          render();
+          return;
+        }
+        const localMiss = loadCodes().find((item) => item.hash === hash);
+        if (!localMiss) {
+          codeError = String(result.error ?? 'Koden ble ikke godtatt.');
+          render();
+          return;
+        }
+      } catch (error) {
+        const localMiss = loadCodes().find((item) => item.hash === hash);
+        if (!localMiss) {
+          codeError = error instanceof Error ? error.message : 'Kunne ikke kontakte lagringstjeneren.';
+          render();
+          return;
+        }
+      }
+    }
     const local = loadCodes().find((item) => item.hash === hash);
     if (local) {
       if (isExpired(local.expiresAt, Date.now())) {
@@ -365,30 +394,8 @@ export function mountParticipant(root: HTMLElement): () => void {
       render();
       return;
     }
-    const endpoint = await resolveEndpoint();
-    if (!endpoint.scriptUrl) {
-      codeError = 'Koden finnes ikke på denne maskinen, og ingen lagringstjener er satt opp.';
-      render();
-      return;
-    }
-    try {
-      const result = await getScript(endpoint.scriptUrl, { action: 'redeem', hash });
-      if (result.ok !== true) {
-        codeError = String(result.error ?? 'Koden ble ikke godtatt.');
-        render();
-        return;
-      }
-      configHolder.config = parseConfig(result.config);
-      if (languageChosen) configHolder.config.language = uiLanguage;
-      configHolder.number = Number(result.participantNumber);
-      configHolder.hash = hash;
-      phase = 'instruction';
-      codeError = '';
-      render();
-    } catch (error) {
-      codeError = error instanceof Error ? error.message : 'Kunne ikke kontakte lagringstjeneren.';
-      render();
-    }
+    codeError = 'Koden finnes ikke på denne maskinen, og ingen lagringstjener er satt opp.';
+    render();
   };
 
   const boot = () => {
@@ -403,9 +410,7 @@ export function mountParticipant(root: HTMLElement): () => void {
         return;
       }
     }
-    const match = hash.match(/#\/kode\/([A-Za-z0-9-]+)/);
-    const query = new URLSearchParams(location.search).get('kode');
-    const code = match?.[1] ?? query ?? '';
+    const code = parseParticipantCode(hash, location.search);
     if (code) {
       void resolve(code);
       return;

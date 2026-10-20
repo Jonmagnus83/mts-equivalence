@@ -1,4 +1,4 @@
-import { expiryFrom, formatCode, generateCode, generateParticipantNumber, hashCode } from './codes';
+import { formatCode, generateParticipantNumber, hashCode, participantLink } from './codes';
 import { storageFolder } from './folders';
 import { assignSymbols, parseConfig } from './config';
 import { formatRatio, jonTestRequired, literatureRequired, requiredCorrect } from './criteria';
@@ -7,11 +7,14 @@ import { shell } from './shell';
 import { stimulusSvg } from './symbols';
 import { planSizes } from './trials';
 import {
+  clearSessionToken,
   downloadText,
   loadCodes,
   loadEndpointFile,
   loadSavedConfig,
+  loadSessionToken,
   loadSettings,
+  loginExperimenter,
   postScript,
   resolveEndpoint,
   saveCodes,
@@ -27,6 +30,9 @@ export function mountExperimenter(root: HTMLElement): () => void {
   let config = parseConfig(loadSavedConfig() ?? undefined);
   let settings = loadSettings();
   let message = '';
+  let readyLink = '';
+  let loginError = '';
+  let offlineUnlocked = location.protocol === 'file:';
 
   const persist = () => {
     saveConfig(config);
@@ -84,7 +90,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
     const pressed = root.querySelector<HTMLButtonElement>('.folder-toggle [aria-pressed="true"]');
     settings = {
       scriptUrl: value('scriptUrl').trim(),
-      secret: value('secret'),
+      secret: settings.secret,
       middle: storageFolder(pressed?.dataset.folder ?? settings.middle),
     };
     persist();
@@ -153,7 +159,56 @@ export function mountExperimenter(root: HTMLElement): () => void {
     return `<table class="codes"><thead><tr><th>Kode</th><th>Nummer</th><th>Utløper</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   };
 
+  const renderLogin = () => {
+    root.innerHTML = `<div class="setup">${shell('oppsett', 'MTS-lab · Eksperimentoppsett')}
+      <form class="cards" id="login-form">
+        <section class="card">
+          <h2><span class="num">·</span> Innlogging</h2>
+          <p class="hint">Brukernavn og passord sjekkes i Apps Script. Den statiske siden lagrer ikke passordet. Deltakerlenken trenger ikke dette passordet.</p>
+          <div class="fields">
+            ${field('scriptUrl', 'Apps Script-adresse (/exec)', settings.scriptUrl)}
+            ${field('username', 'Brukernavn', '')}
+            <label class="field">Passord
+              <input id="password" type="password" autocomplete="current-password" />
+            </label>
+          </div>
+          <div class="actions">
+            <button class="solid" type="submit">Logg inn</button>
+            <button class="ghost" type="button" id="offline-only">Fortsett uten nett</button>
+          </div>
+          <p class="warn">${escapeText(loginError)}</p>
+          <p class="hint">Uten nett virker bare «Start økt på denne maskinen». Lenken til en annen PC krever innlogging og Apps Script.</p>
+        </section>
+      </form>
+    </div>`;
+    root.querySelector('#login-form')?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const url = (root.querySelector('#scriptUrl') as HTMLInputElement | null)?.value.trim() ?? '';
+      const username = (root.querySelector('#username') as HTMLInputElement | null)?.value.trim() ?? '';
+      const password = (root.querySelector('#password') as HTMLInputElement | null)?.value ?? '';
+      settings.scriptUrl = url;
+      saveSettings(settings);
+      void loginExperimenter(url, username, password)
+        .then(() => {
+          loginError = '';
+          render();
+        })
+        .catch((error: unknown) => {
+          loginError = error instanceof Error ? error.message : 'Innlogging feilet.';
+          renderLogin();
+        });
+    });
+    root.querySelector('#offline-only')?.addEventListener('click', () => {
+      offlineUnlocked = true;
+      render();
+    });
+  };
+
   const render = () => {
+    if (!loadSessionToken() && !offlineUnlocked) {
+      renderLogin();
+      return;
+    }
     const pictureOptions = ['<option value="">Ingen bilder</option>']
       .concat(
         Array.from({ length: config.members }, (_, index) => {
@@ -243,12 +298,17 @@ export function mountExperimenter(root: HTMLElement): () => void {
         </section>
         <section class="card">
           <h2><span class="num">4</span> Deltakerkoder</h2>
-          <p class="hint">Hver kode gjelder én deltaker, utløper etter 24 timer og knyttes til et tilfeldig nummer på fem sifre. Bare en hash sendes til Apps Script.</p>
+          <p class="hint">Lagring oppretter en kode i Apps Script. Lenken virker på en annen PC i 24 timer. Bare en hash lagres. Flere deltakere kan kjøre samtidig, hver med sin kode.</p>
           <div class="actions">
-            <button type="button" class="solid" id="make-code">Generer deltakerkode</button>
+            <button type="button" class="solid" id="make-code">Lagre eksperiment og hent lenke</button>
             <button type="button" class="ghost" id="start-here">Start økt på denne maskinen</button>
+            <button type="button" class="ghost" id="list-results">Hent resultatliste</button>
           </div>
           <p id="message">${escapeText(message)}</p>
+          <label class="field wide">Deltakerlenke
+            <input id="ready-link" type="text" readonly value="${escapeAttr(readyLink)}" />
+          </label>
+          <div id="result-list"></div>
           <div id="codes">${codesTable()}</div>
         </section>
         <section class="card">
@@ -269,10 +329,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
                 <option value="en" ${config.language === 'en' ? 'selected' : ''}>Engelsk</option>
               </select>
             </label>
-            ${field('scriptUrl', 'Apps Script-adresse', settings.scriptUrl)}
-            <label class="field">Hemmelighet (bare i denne nettleseren)
-              <input id="secret" type="password" value="${escapeAttr(settings.secret)}" autocomplete="off" />
-            </label>
+            ${field('scriptUrl', 'Apps Script-adresse (/exec)', settings.scriptUrl)}
             <label class="field wide">Instruksjon, norsk
               <textarea id="instructionNo">${escapeText(config.instructionNo)}</textarea>
             </label>
@@ -289,6 +346,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             <input id="json-file" type="file" accept="application/json,.json" hidden />
             <button type="button" class="ghost" id="ping">Test tilkobling</button>
             <button type="button" class="ghost" id="endpoint-file">Last ned lagring.json</button>
+            <button type="button" class="ghost" id="logout">Logg ut</button>
           </div>
         </section>
       </form>
@@ -306,6 +364,8 @@ export function mountExperimenter(root: HTMLElement): () => void {
     if (codes) codes.innerHTML = codesTable();
     const messageNode = root.querySelector('#message');
     if (messageNode) messageNode.textContent = message;
+    const linkNode = root.querySelector('#ready-link') as HTMLInputElement | null;
+    if (linkNode) linkNode.value = readyLink;
   };
 
   const bindUploads = () => {
@@ -361,6 +421,15 @@ export function mountExperimenter(root: HTMLElement): () => void {
       read();
       void issueCode();
     });
+    root.querySelector('#list-results')?.addEventListener('click', () => {
+      read();
+      void listResults();
+    });
+    root.querySelector('#logout')?.addEventListener('click', () => {
+      clearSessionToken();
+      offlineUnlocked = location.protocol === 'file:';
+      render();
+    });
     root.querySelector('#start-here')?.addEventListener('click', () => {
       read();
       const used = new Set(loadCodes().map((item) => item.participantNumber));
@@ -397,60 +466,115 @@ export function mountExperimenter(root: HTMLElement): () => void {
   };
 
   const issueCode = async () => {
-    const rng = mulberry32(cryptoSeed());
-    const code = generateCode(rng);
-    const hash = await hashCode(code);
-    const used = new Set(loadCodes().map((item) => item.participantNumber));
-    let participantNumber = generateParticipantNumber(rng, used);
-    const createdAt = new Date().toISOString();
-    const expiresAt = expiryFrom(Date.now());
     const endpoint = await resolveEndpoint();
-    if (endpoint.scriptUrl) {
-      if (!endpoint.secret) {
-        message = 'Skriv inn hemmeligheten fra Apps Script før koden kan lagres i Drive.';
-        refreshBits();
+    const token = loadSessionToken();
+    if (!endpoint.scriptUrl || !token) {
+      readyLink = '';
+      message = 'Logg inn mot Apps Script for å lagre eksperimentet. Lenken virker da på en annen PC. Uten nett bruker du «Start økt på denne maskinen».';
+      if (!token && location.protocol !== 'file:') {
+        offlineUnlocked = false;
+        render();
         return;
       }
-      try {
-        const result = await postScript(endpoint.scriptUrl, {
-          action: 'register',
-          secret: endpoint.secret,
-          hash,
-          participantNumber,
-          project: config.studyId,
-          middle: endpoint.middle,
-          expiresAt,
-          config,
-        });
-        if (result.ok !== true) {
-          message = String(result.error ?? 'Koden ble ikke registrert.');
-          refreshBits();
+      refreshBits();
+      return;
+    }
+    try {
+      const result = await postScript(endpoint.scriptUrl, {
+        action: 'register',
+        token,
+        project: config.studyId,
+        middle: endpoint.middle,
+        config,
+      });
+      if (result.ok !== true || typeof result.code !== 'string') {
+        const error = String(result.error ?? 'Kunne ikke lagre eksperimentet.');
+        if (error.includes('Logg inn')) {
+          clearSessionToken();
+          loginError = error;
+          render();
           return;
         }
-        if (typeof result.participantNumber === 'number') participantNumber = result.participantNumber;
-      } catch (error) {
-        message = error instanceof Error ? error.message : 'Kunne ikke registrere koden.';
+        message = error;
         refreshBits();
         return;
       }
+      const code = result.code;
+      const participantNumber = Number(result.participantNumber);
+      const expiresAt = String(result.expiresAt ?? '');
+      const hash = await hashCode(code);
+      const stored: StoredCode = {
+        code: code.replace('-', ''),
+        hash,
+        participantNumber,
+        expiresAt,
+        createdAt: new Date().toISOString(),
+        completed: false,
+        config,
+      };
+      const codes = loadCodes();
+      codes.push(stored);
+      saveCodes(codes);
+      readyLink = participantLink(code);
+      message = `Kode ${formatCode(code)}. Deltakernummer ${participantNumber}. Utløper ${expiresAt ? new Date(expiresAt).toLocaleString('nb-NO') : 'om 24 timer'}.`;
+      refreshBits();
+    } catch (error) {
+      message = error instanceof Error ? error.message : 'Kunne ikke lagre eksperimentet.';
+      refreshBits();
     }
-    const stored: StoredCode = {
-      code: code.replace('-', ''),
-      hash,
-      participantNumber,
-      expiresAt,
-      createdAt,
-      completed: false,
-      config,
-    };
-    const codes = loadCodes();
-    codes.push(stored);
-    saveCodes(codes);
-    const link = `${location.origin}${location.pathname}#/kode/${formatCode(stored.code)}`;
-    message = endpoint.scriptUrl
-      ? `Kode ${formatCode(stored.code)}. Deltakernummer ${participantNumber}. Utløper om 24 timer. Lenke: ${link}`
-      : `Kode ${formatCode(stored.code)}. Deltakernummer ${participantNumber}. Uten Apps Script virker koden bare i denne nettleseren. Lenke: ${link}`;
-    refreshBits();
+  };
+
+  const listResults = async () => {
+    const endpoint = await resolveEndpoint();
+    const token = loadSessionToken();
+    if (!endpoint.scriptUrl || !token) {
+      message = 'Logg inn for å hente resultater.';
+      refreshBits();
+      return;
+    }
+    try {
+      const result = await postScript(endpoint.scriptUrl, { action: 'list', token });
+      if (result.ok !== true || !Array.isArray(result.rows)) {
+        message = String(result.error ?? 'Kunne ikke hente listen.');
+        refreshBits();
+        return;
+      }
+      const rows = result.rows as Array<Record<string, unknown>>;
+      const html = rows.length
+        ? `<table class="codes"><thead><tr><th>Nummer</th><th>Prosjekt</th><th>Mappe</th><th>Status</th><th></th></tr></thead><tbody>${rows
+            .map((row) => `<tr>
+              <td>${escapeText(String(row.participantNumber ?? ''))}</td>
+              <td>${escapeText(String(row.project ?? ''))}</td>
+              <td>${escapeText(String(row.middle ?? ''))}</td>
+              <td>${row.completed ? 'ferdig' : 'aktiv'}</td>
+              <td><button type="button" class="ghost" data-download="${escapeAttr(String(row.participantNumber ?? ''))}">CSV</button></td>
+            </tr>`)
+            .join('')}</tbody></table>`
+        : '<p>Ingen deltakere ennå.</p>';
+      const box = root.querySelector('#result-list');
+      if (box) box.innerHTML = html;
+      box?.querySelectorAll<HTMLButtonElement>('[data-download]').forEach((button) => {
+        button.addEventListener('click', () => {
+          void downloadResult(button.dataset.download ?? '');
+        });
+      });
+    } catch (error) {
+      message = error instanceof Error ? error.message : 'Kunne ikke hente listen.';
+      refreshBits();
+    }
+  };
+
+  const downloadResult = async (participantNumber: string) => {
+    const endpoint = await resolveEndpoint();
+    const token = loadSessionToken();
+    if (!endpoint.scriptUrl || !token) return;
+    const result = await postScript(endpoint.scriptUrl, { action: 'download', token, participantNumber });
+    if (result.ok !== true || typeof result.csv !== 'string') {
+      message = String(result.error ?? 'Ingen fil.');
+      refreshBits();
+      return;
+    }
+    downloadText(`${participantNumber}.csv`, result.csv, 'text/csv;charset=utf-8');
   };
 
   const ping = async () => {
@@ -461,8 +585,10 @@ export function mountExperimenter(root: HTMLElement): () => void {
       return;
     }
     try {
-      const result = await postScript(endpoint.scriptUrl, { action: 'ping', secret: endpoint.secret });
-      message = result.ok === true ? 'Tilkoblingen virker.' : String(result.error ?? 'Tilkoblingen svarte ikke som ventet.');
+      const result = await postScript(endpoint.scriptUrl, { action: 'ping' });
+      message = result.ok === true
+        ? (result.experimenterConfigured ? 'Tilkoblingen virker. Eksperimentator er satt opp.' : 'Tilkoblingen virker. Kjør installerEksperimentator i Apps Script.')
+        : String(result.error ?? 'Tilkoblingen svarte ikke som ventet.');
     } catch (error) {
       message = error instanceof Error ? error.message : 'Tilkoblingen feilet.';
     }

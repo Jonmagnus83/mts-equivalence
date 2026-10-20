@@ -7,6 +7,7 @@ const CONFIG_KEY = 'mts-lab-config';
 const CODES_KEY = 'mts-lab-codes';
 const SETTINGS_KEY = 'mts-lab-settings';
 const SESSION_KEY = 'mts-lab-active-session';
+const AUTH_KEY = 'mts-lab-auth';
 const LOCAL_RUN_KEY = 'mts-lab-local-run';
 
 export interface LabSettings {
@@ -155,6 +156,46 @@ export async function loadEndpointFile(): Promise<EndpointFile> {
   } catch {
     return { scriptUrl: '', middle: 'Mennesker' };
   }
+}
+
+export interface ExperimenterSession {
+  token: string;
+  expiresAt: number;
+}
+
+export function loadSessionToken(): string | null {
+  const raw = read(AUTH_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as ExperimenterSession;
+    if (!parsed.token || parsed.expiresAt <= Date.now()) return null;
+    return parsed.token;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSessionToken(token: string, expiresInSec: number): void {
+  const value: ExperimenterSession = { token, expiresAt: Date.now() + expiresInSec * 1000 };
+  write(AUTH_KEY, JSON.stringify(value));
+}
+
+export function clearSessionToken(): void {
+  try {
+    localStorage.removeItem(AUTH_KEY);
+  } catch {
+    memory.delete(AUTH_KEY);
+  }
+}
+
+export async function loginExperimenter(url: string, username: string, password: string): Promise<string> {
+  const result = await postScript(url, { action: 'login', username, password });
+  if (result.ok !== true || typeof result.token !== 'string') {
+    throw new Error(String(result.error ?? 'Innlogging feilet.'));
+  }
+  const expiresIn = typeof result.expiresInSec === 'number' ? result.expiresInSec : 21600;
+  saveSessionToken(result.token, expiresIn);
+  return result.token;
 }
 
 export async function resolveEndpoint(): Promise<EndpointFile & { secret: string }> {

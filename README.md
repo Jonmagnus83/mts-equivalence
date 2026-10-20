@@ -39,13 +39,17 @@ Hvis deltakeren bytter fane, mister fokus eller avslutter fullskjerm, logges hen
 
 **Ærlig grense.** En nettleser kan ikke hindre at fanen lukkes, og den kan ikke se en mobil, et notat eller en annen skjerm. Programmet kan varsle, oppdage og logge. Det er alt.
 
-## Koder
+## Innlogging og koder
 
-**Generer deltakerkode** lager en kode og et tilfeldig deltakernummer fra 10000 til 99999. Koden utløper etter 24 timer. Bare hashen sendes til Apps Script. Selve koden vises hos deg og huskes i nettleseren din, slik at du kan gi den til deltakeren.
+Oppsettssiden ber om brukernavn og passord. De sjekkes i Apps Script, ikke i den statiske siden. Passordet lagres aldri i git. Deltakeren trenger ikke passordet.
 
-Uten Apps Script virker koden bare i nettleseren der den ble laget. Med Apps Script kan deltakeren sitte hvor som helst. Se [docs/apps-script-oppsett.md](docs/apps-script-oppsett.md).
+**Lagre eksperiment og hent lenke** lagrer oppsettet i Apps Script og viser en lenke:
 
-**Start økt på denne maskinen** hopper over koden. Det er veien for en frakoblet økt og for en gjennomkjøring ved siden av deltakeren.
+`https://jonmagnus83.github.io/mts-equivalence/#/delta?k=ABCD-2345`
+
+Koden utløper etter 24 timer. Apps Script lagrer bare en hash, og trekker et deltakernummer på minst fem sifre. Samme lenke åpner det samme eksperimentet på en annen PC. Flere deltakere kan kjøre samtidig.
+
+Uten Apps Script virker bare **Start økt på denne maskinen**. Det er også veien for den frakoblede filen. Se [docs/apps-script-oppsett.md](docs/apps-script-oppsett.md).
 
 ## Resultatfilene
 
@@ -71,7 +75,7 @@ Noen nettlesere spør før de tillater flere nedlastinger. Excel-filen kommer f�
 
 Arbeidsflyten ligger i `.github/workflows/pages.yml`. Den kjører testene, bygger med base-adresse `/mts-equivalence/` og laster opp `dist/`.
 
-Pages er ikke aktivt bare fordi filen ligger i repositoriet. En administrator må åpne **Settings → Pages → Build and deployment → Source: GitHub Actions**. Etter at `main` er oppdatert, publiseres siden på `https://jonmagnus83.github.io/mts-equivalence/`.
+Arbeidsflyten slår på Pages selv (`actions/configure-pages` med `enablement: true`) når den kjører på `main`. Siden blir `https://jonmagnus83.github.io/mts-equivalence/`.
 
 Før den adressen deles med deltakere: legg Apps Script-adressen i `public/lagring.json` og bygg på nytt, hvis resultatene skal til Drive. Hemmeligheten skal ikke stå i den filen.
 

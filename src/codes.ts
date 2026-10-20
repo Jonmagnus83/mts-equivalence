@@ -44,3 +44,24 @@ export function isExpired(expiresAtIso: string, nowMs: number): boolean {
   const t = Date.parse(expiresAtIso);
   return Number.isNaN(t) || t <= nowMs;
 }
+
+/** Published site. Participant links always use this host so they work on any computer. */
+export const PUBLIC_SITE = 'https://jonmagnus83.github.io/mts-equivalence/';
+
+export function participantLink(code: string): string {
+  const formatted = formatCode(code);
+  return `${PUBLIC_SITE}#/delta?k=${encodeURIComponent(formatted)}`;
+}
+
+/** Reads `#/delta?k=`, `?k=`, the older `#/kode/`, and `?kode=`. */
+export function parseParticipantCode(hash: string, search = ''): string {
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex >= 0) {
+    const fromHash = new URLSearchParams(hash.slice(queryIndex + 1)).get('k');
+    if (fromHash) return normalizeCode(fromHash);
+  }
+  const fromSearch = new URLSearchParams(search).get('k') ?? new URLSearchParams(search).get('kode');
+  if (fromSearch) return normalizeCode(fromSearch);
+  const older = hash.match(/#\/kode\/([A-Za-z0-9-]+)/);
+  return older?.[1] ? normalizeCode(older[1]) : '';
+}

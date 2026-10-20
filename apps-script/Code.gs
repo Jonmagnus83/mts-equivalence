@@ -5,12 +5,18 @@
  * a SHA-256 hash of each participant code, never the code itself and never
  * a name, e-mail address or other personal data.
  *
- * Script properties:
- *   EXPERIMENTER_SECRET  required for register
- *   The result folder is chosen in the app: Mennesker or Boter-AI.
- *   MIDDLE_FOLDER is ignored for that choice. The code registry lives in MTS-koder.
- *   ROOT_FOLDER_ID       optional. Empty means the root of the owner's Drive.
+ * Experimenter login (never commit these):
+ *   Run installerEksperimentator once. It reads OPPSETT_BRUKERNAVN and
+ *   OPPSETT_PASSORD, stores a salted SHA-256 hash, then deletes the plaintext.
+ *   EXPERIMENTER_USER, EXPERIMENTER_SALT, EXPERIMENTER_PASSWORD_HASH, SESSION_SECRET
+ *
+ * Result folder is chosen in the app: Mennesker or Boter-AI.
+ * ROOT_FOLDER_ID is optional. Empty means the root of the owner's Drive.
+ * The code registry lives in the MTS-koder folder. Only code hashes are stored.
  */
+
+var SESSION_TTL_SEC = 21600;
+var CODE_ALPHABET_ = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 var CODE_HEADERS = ['hash', 'participantNumber', 'project', 'middle', 'expiresAt', 'createdAt', 'completed', 'configFileId'];
 
@@ -37,14 +43,16 @@ function handle_(body) {
       return json_({
         ok: true,
         service: 'mts-lab',
-        auth: secretOk_(body.secret),
-        secretConfigured: Boolean(prop_('EXPERIMENTER_SECRET')),
+        experimenterConfigured: Boolean(prop_('EXPERIMENTER_PASSWORD_HASH')),
       });
     }
+    if (action === 'login') return json_(login_(body));
     if (action === 'register') return json_(register_(body));
+    if (action === 'list') return json_(list_(body));
+    if (action === 'download') return json_(download_(body));
     if (action === 'redeem') return json_(redeem_(body.hash));
     if (action === 'submit') return json_(submit_(body));
-    if (action === 'cleanup') return json_(cleanupAll_());
+    if (action === 'cleanup') return json_(cleanupAll_(body));
     return json_({ ok: false, error: 'Ukjent handling.' });
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message ? err.message : err) });
@@ -53,31 +61,112 @@ function handle_(body) {
   }
 }
 
+/**
+ * One-time setup. In Script properties, set OPPSETT_BRUKERNAVN and OPPSETT_PASSORD,
+ * run this function, then delete is done for you. The plaintext password is not kept.
+ */
+function installerEksperimentator() {
+  var props = PropertiesService.getScriptProperties();
+  var username = String(props.getProperty('OPPSETT_BRUKERNAVN') || '').trim();
+  var password = String(props.getProperty('OPPSETT_PASSORD') || '');
+  if (!username || password.length < 8) {
+    throw new Error('Legg inn OPPSETT_BRUKERNAVN og OPPSETT_PASSORD (minst 8 tegn) før du kjører funksjonen.');
+  }
+  var salt = Utilities.getUuid() + Utilities.getUuid();
+  props.setProperties({
+    EXPERIMENTER_USER: username,
+    EXPERIMENTER_SALT: salt,
+    EXPERIMENTER_PASSWORD_HASH: hashPassword_(password, salt),
+    SESSION_SECRET: Utilities.getUuid() + Utilities.getUuid(),
+  });
+  props.deleteProperty('OPPSETT_PASSORD');
+  props.deleteProperty('OPPSETT_BRUKERNAVN');
+  Logger.log('Eksperimentator er satt opp for ' + username + '. Klartekstpassordet er slettet.');
+}
+
+function login_(body) {
+  var props = PropertiesService.getScriptProperties();
+  var username = props.getProperty('EXPERIMENTER_USER') || '';
+  var salt = props.getProperty('EXPERIMENTER_SALT') || '';
+  var expected = props.getProperty('EXPERIMENTER_PASSWORD_HASH') || '';
+  if (!username || !salt || !expected) return { ok: false, error: 'Eksperimentator er ikke satt opp.' };
+  var givenUser = String(body.username || '').trim();
+  var givenHash = hashPassword_(String(body.password || ''), salt);
+  if (givenUser !== username || givenHash !== expected) {
+    return { ok: false, error: 'Feil brukernavn eller passord.' };
+  }
+  var token = sha256hex_((props.getProperty('SESSION_SECRET') || '') + Utilities.getUuid() + Utilities.getUuid());
+  CacheService.getScriptCache().put('tok_' + token, username, SESSION_TTL_SEC);
+  return { ok: true, token: token, expiresInSec: SESSION_TTL_SEC };
+}
+
+function requireExperimenter_(body) {
+  var token = String(body.token || '');
+  if (!token) return false;
+  return Boolean(CacheService.getScriptCache().get('tok_' + token));
+}
+
 function register_(body) {
-  if (!secretOk_(body.secret)) return { ok: false, error: 'Hemmeligheten stemmer ikke.' };
-  var hash = String(body.hash || '').toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(hash)) return { ok: false, error: 'Hash mangler.' };
+  if (!requireExperimenter_(body)) return { ok: false, error: 'Logg inn på nytt.' };
+  var code = generateCode_();
+  var hash = sha256hex_(normalizeCode_(code));
   var book = codeBook_();
   var sheet = book.getSheets()[0];
   cleanupSheet_(sheet);
-  var existing = findHash_(sheet, hash);
-  if (existing) {
-    return { ok: true, participantNumber: Number(existing.participantNumber), expiresAt: existing.expiresAt };
-  }
   var used = usedNumbers_(sheet);
-  var participantNumber = Number(body.participantNumber);
-  if (!participantNumber || participantNumber < 10000 || used[participantNumber]) {
-    participantNumber = freshNumber_(used);
-  }
+  var participantNumber = freshNumber_(used);
   var project = safeName_(body.project || 'mts');
   var middle = allowedMiddle_(body.middle);
-  var expiresAt = body.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  var expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   var configFolder = childFolder_(registryFolder_(), 'oppsett');
   var configFile = configFolder.createFile(
     Utilities.newBlob(JSON.stringify(body.config || {}), 'application/json', hash + '.json')
   );
   sheet.appendRow([hash, participantNumber, project, middle, expiresAt, new Date().toISOString(), '0', configFile.getId()]);
-  return { ok: true, participantNumber: participantNumber, expiresAt: expiresAt };
+  return {
+    ok: true,
+    code: code.slice(0, 4) + '-' + code.slice(4),
+    participantNumber: participantNumber,
+    expiresAt: expiresAt,
+  };
+}
+
+function list_(body) {
+  if (!requireExperimenter_(body)) return { ok: false, error: 'Logg inn på nytt.' };
+  var sheet = codeBook_().getSheets()[0];
+  cleanupSheet_(sheet);
+  var values = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < values.length; i++) {
+    rows.push({
+      participantNumber: values[i][1],
+      project: values[i][2],
+      middle: values[i][3],
+      expiresAt: values[i][4],
+      createdAt: values[i][5],
+      completed: String(values[i][6]) === '1',
+    });
+  }
+  return { ok: true, rows: rows };
+}
+
+function download_(body) {
+  if (!requireExperimenter_(body)) return { ok: false, error: 'Logg inn på nytt.' };
+  var sheet = codeBook_().getSheets()[0];
+  var wanted = String(body.participantNumber || '');
+  var values = sheet.getDataRange().getValues();
+  var row = null;
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][1]) === wanted) row = values[i];
+  }
+  if (!row) return { ok: false, error: 'Fant ikke deltakeren.' };
+  var folder = childFolder_(
+    childFolder_(middleFolder_(allowedMiddle_(row[3])), safeName_(row[2])),
+    wanted
+  );
+  var files = folder.getFilesByName(wanted + '.csv');
+  if (!files.hasNext()) return { ok: false, error: 'Ingen resultatfil ennå.' };
+  return { ok: true, participantNumber: wanted, csv: files.next().getBlob().getDataAsString() };
 }
 
 function redeem_(hash) {
@@ -124,7 +213,8 @@ function submit_(body) {
   return { ok: true, participantNumber: Number(participantNumber), folder: folder.getName() };
 }
 
-function cleanupAll_() {
+function cleanupAll_(body) {
+  if (!requireExperimenter_(body)) return { ok: false, error: 'Logg inn på nytt.' };
   var sheet = codeBook_().getSheets()[0];
   var removed = cleanupSheet_(sheet);
   return { ok: true, removed: removed };
@@ -270,9 +360,29 @@ function safeName_(name) {
   return text.slice(0, 80) || 'mts';
 }
 
-function secretOk_(secret) {
-  var expected = prop_('EXPERIMENTER_SECRET');
-  return Boolean(expected) && String(secret || '') === expected;
+function generateCode_() {
+  var raw = '';
+  for (var i = 0; i < 8; i++) raw += CODE_ALPHABET_.charAt(Math.floor(Math.random() * CODE_ALPHABET_.length));
+  return raw;
+}
+
+function normalizeCode_(code) {
+  return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function sha256hex_(text) {
+  return toHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
+}
+
+function hashPassword_(password, salt) {
+  return sha256hex_(salt + '\n' + password);
+}
+
+function toHex_(bytes) {
+  return bytes.map(function (b) {
+    var v = b < 0 ? b + 256 : b;
+    return ('0' + v.toString(16)).slice(-2);
+  }).join('');
 }
 
 function prop_(key) {

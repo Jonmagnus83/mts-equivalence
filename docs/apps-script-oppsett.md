@@ -1,85 +1,111 @@
-# Apps Script: lagring i din egen Google Drive
+# Apps Script: lim inn, sett opp, publiser
 
-Dette oppsettet gjør at resultatene fra nettversjonen skrives til **din** Google Drive. Appen lagrer ingen personopplysninger. Det som sendes til skriptet, er en SHA-256-hash av deltakerkoden, et tilfeldig deltakernummer på minst fem sifre, oppsettet og forsøksradene.
+Dette gjøres i Jons egen Google-konto. Ingen andre skal logge inn der. Nettstedet på GitHub Pages er statisk. Brukernavn og passord sjekkes bare i Apps Script.
 
-Mappene blir:
+Etterpå virker en deltakerlenke på en hvilken som helst PC:
 
-```text
-Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>
-Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>.csv
-Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>.xlsx
-Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>_hendelser.csv
-```
+`https://jonmagnus83.github.io/mts-equivalence/#/delta?k=KODEN`
 
-`<deltakernummer>` uten etternavn er et Google-ark med fanene Data, Parametere og Hendelser. `.xlsx` er den samme filen som nettleseren lager. Prosjektmappen er studie-ID-en fra oppsettssiden.
+Koden utløper etter 24 timer. Apps Script lagrer bare en SHA-256-hash av koden, et tilfeldig deltakernummer på minst fem sifre, og oppsettet. Flere deltakere kan kjøre samtidig. Hver kode er sin egen økt.
 
-På oppsettssiden, kort 5, velger du **Lagringsmappe**: `Mennesker` eller `Boter-AI`. Valget sendes med koden og med resultatfilene. Skriptet oppretter den mappen under Min disk. En skriptegenskap kan ikke overstyre valget.
+Resultatene legges i
 
-Kodearket ligger for seg selv i `MTS-koder`, uavhengig av hvilken resultatmappe du valgte. Der står hashen, deltakernummeret, prosjektet, mappen og utløpstidspunktet. Selve koden står ikke der. Rader som er eldre enn 24 timer, slettes neste gang noen registrerer, løser inn eller sender inn data. Da slettes også oppsettsfilen som hørte til hashen.
+`Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>`
 
-En lokal kopi lastes alltid ned i nettleseren, også når opplastingen virker.
+Mappen `Mennesker` eller `Boter-AI` velges på oppsettssiden. Google-arket har fanene Data, Parametere og Hendelser. Samme mappe får også `.xlsx` og `.csv` når nettleseren sender dem. En kopi lastes alltid ned lokalt i tillegg.
 
-## 1. Opprett skriptet
+Kodelisten ligger i mappen `MTS-koder`, adskilt fra resultatene. Der står hashen, ikke koden.
 
-1. Åpne [script.google.com](https://script.google.com) mens du er logget inn på Google-kontoen som eier Drive-mappen.
-2. Velg **Nytt prosjekt**.
-3. Gi prosjektet et navn, for eksempel `MTS-lab`.
-4. Slett innholdet i `Code.gs` og lim inn filen `apps-script/Code.gs` fra dette repositoriet.
-5. Velg tannhjulet **Prosjektinnstillinger**. Kryss av for at `appsscript.json` skal vises i editoren.
-6. Åpne `appsscript.json` og lim inn innholdet fra `apps-script/appsscript.json`.
+Frakoblet fil (`dist-offline/index.html`, åpnet med `file://`) trenger ikke Apps Script. Da brukes **Start økt på denne maskinen**, og filene lastes ned lokalt. Deltakerlenken til en annen PC krever at skriptet er publisert og at adressen ligger i `public/lagring.json`.
 
-## 2. Legg inn hemmeligheten
+## 1. Nytt prosjekt og lim inn koden
 
-1. I prosjektinnstillingene, under **Skriptegenskaper**, velg **Legg til skriptegenskap**.
-2. Egenskap: `EXPERIMENTER_SECRET`. Verdi: et langt passord du finner på selv. Det brukes bare når du oppretter koder, ikke av deltakeren.
-3. Valgfritt: `ROOT_FOLDER_ID` hvis filene skal ligge i en annen mappe enn roten av Min disk. Da er ID-en den lange koden i adresselinjen når mappen er åpen i Drive.
-4. Lagre.
+1. Åpne [script.google.com](https://script.google.com) mens du er logget inn som Jon.
+2. Klikk **Nytt prosjekt**.
+3. Gi prosjektet navnet `MTS-lab`.
+4. Slett alt i `Code.gs`.
+5. Lim inn hele filen `apps-script/Code.gs` fra dette repositoriet. Det skal være én fil.
+6. Klikk lagre (diskett-ikonet eller Ctrl+S).
 
-Skriv hemmeligheten ned et sted du har kontroll på. Den skal ikke legges i git, i `lagring.json` eller i en deltakerlenke.
+## 2. Sett brukernavn og passord
+
+Ikke skriv passordet inn i koden, og ikke legg det i git.
+
+1. Klikk tannhjulet **Prosjektinnstillinger**.
+2. Under **Skriptegenskaper**, klikk **Legg til skriptegenskap**.
+3. Egenskap `OPPSETT_BRUKERNAVN`, verdi: brukernavnet eksperimentatoren skal skrive på oppsettssiden.
+4. Legg til en egenskap til: `OPPSETT_PASSORD`, verdi: et passord på minst 8 tegn.
+5. Lagre egenskapene.
+6. Gå tilbake til editoren. Velg funksjonen `installerEksperimentator` i nedtrekkslisten og klikk **Kjør**.
+7. Godta tillatelsene Google spør om. Skriptet skal kunne bruke Drive for filene det selv lager.
+8. Når kjøringen er ferdig, er passordet hashet med salt. Klartekstfeltene `OPPSETT_BRUKERNAVN` og `OPPSETT_PASSORD` er slettet. De skal ikke legges inn på nytt.
+
+Vil du bytte passord senere, legger du inn de to egenskapene på nytt og kjører `installerEksperimentator` en gang til.
+
+Valgfritt: egenskapen `ROOT_FOLDER_ID` hvis filene skal ligge i en annen mappe enn roten av Min disk. ID-en er den lange koden i adresselinjen når mappen er åpen.
 
 ## 3. Publiser web-appen
 
-1. Velg **Distribuer** → **Ny distribusjon**.
-2. Type: **Nettapp**.
-3. Kjør som: **Meg**.
-4. Hvem har tilgang: **Alle** (også personer som ikke er logget inn). Deltakerne har ikke Google-konto i forsøket, så tilgangen må være åpen. Hemmeligheten beskytter registrering av nye koder. Innlevering krever en gyldig, uutsatt hash.
-5. Distribuer, og godta tillatelsene Drive ber om. Skriptet skal kunne opprette og endre filer som det selv lager.
-6. Kopier nettadressen som slutter på `/exec`.
+1. Klikk **Distribuer** → **Ny distribusjon**.
+2. Velg typen **Nettapp** (tannhjulet ved siden av «Velg type» hvis listen er tom).
+3. Beskrivelse: `MTS-lab`.
+4. **Kjør som:** Meg.
+5. **Hvem har tilgang:** Alle.
+6. Klikk **Distribuer**.
+7. Kopier nettadressen som slutter på `/exec`. Det er den eneste adressen som skal brukes. Ikke bruk adressen som slutter på `/dev`.
 
-Hver gang du endrer `Code.gs`, må du lage en **ny distribusjon** (eller redigere den eksisterende og velge ny versjon). Ellers kjører den gamle koden.
+Deltakerne er ikke innlogget på Google, derfor må tilgangen være **Alle**. De kan bare åpne en kode som finnes, og levere resultater for den koden. De kan ikke lage koder eller lese andres filer. Det krever den korte økttokenen som innloggingen gir eksperimentatoren.
 
-## 4. Koble adressen til MTS-lab
+## 4. Legg adressen inn én gang
 
-1. Åpne oppsettssiden.
-2. Lim nettadressen inn i feltet **Apps Script-adresse**.
-3. Lim hemmeligheten inn i feltet **Hemmelighet**. Den blir bare liggende i denne nettleserens lokale lager, ikke i oppsettsfilen.
-4. Velg **Lagringsmappe**: Mennesker eller Boter-AI.
-5. Velg **Test tilkobling**. Siden skal svare at tilkoblingen virker, og at hemmeligheten er gjenkjent.
-6. Velg **Generer deltakerkode**. I Drive skal du se `MTS-koder`, og etter en ferdig økt mappen du valgte.
+1. Åpne `https://jonmagnus83.github.io/mts-equivalence/#/oppsett`.
+2. Lim `/exec`-adressen inn i feltet **Apps Script-adresse**.
+3. Skriv brukernavn og passord fra steg 2 og klikk **Logg inn**.
+4. Samme adresse må også ligge i filen `public/lagring.json` i repositoriet, slik at en annen PC finner skriptet uten å ha vært innom oppsettssiden:
 
-Deltakere som bruker en annen maskin, må nå den samme adressen. Den følger ikke med koden.
+```json
+{
+  "scriptUrl": "https://script.google.com/macros/s/…/exec",
+  "middle": "Mennesker"
+}
+```
 
-1. Velg **Last ned lagring.json** på oppsettssiden.
-2. Legg filen i `public/lagring.json` i repositoriet. Den inneholder bare nettadressen og mappenavnet, ikke hemmeligheten.
-3. Bygg og publiser på nytt (`npm run build`, deretter GitHub Pages).
+Filen inneholder ingen hemmelighet. Den som har tilgang til GitHub, lagrer filen og pusher til `main`. GitHub Pages publiserer den på nytt. Inntil den filen er oppdatert, kan adressen skrives inn i panelet på én maskin, men deltakerlenker på andre maskiner finner ikke skriptet.
 
-Uten `lagring.json` virker koder likevel i nettleseren der de ble laget, fordi den nettleseren husker dem lokalt.
+5. Klikk **Test tilkobling**. Teksten skal si at tilkoblingen virker og at eksperimentatoren er satt opp.
 
-## 5. Slik ser en økt ut
+## 5. Lag en deltakerlenke
 
-1. Du genererer en kode. Deltakeren får koden eller lenken `#/kode/XXXX-XXXX`.
-2. Koden virker i 24 timer. Når økten er markert ferdig, kan den ikke brukes til en ny økt.
-3. Deltakeren kan fortsette en uferdig økt i samme nettleser. På en annen maskin starter koden økten på nytt så lenge den ikke er ferdig og ikke er utløpt.
-4. Når økten er ferdig, ligger arket, CSV-filen og XLSX-filen i deltakerens mappe. Samme filer lastes ned lokalt.
+1. Fyll inn parametrene på kort 1–3.
+2. På kort 5 velger du **Mennesker** eller **Boter-AI**.
+3. På kort 4 klikker du **Lagre eksperiment og hent lenke**.
+4. Kopier lenken. Den ser slik ut:
 
-## 6. Frakoblet kjøring
+`https://jonmagnus83.github.io/mts-equivalence/#/delta?k=ABCD-2345`
 
-Apps Script brukes ikke når filen åpnes fra en USB-pinne. Da velger du **Start økt på denne maskinen**, og resultatene lastes ned som fil. Se README.
+5. Hver nye deltaker trenger et nytt klikk, og får sin egen kode og sitt eget nummer. Koden virker i 24 timer.
 
-## 7. Hvis noe feiler
+**Hent resultatliste** viser deltakernumrene. **CSV** laster ned resultatfilen når økten er levert.
 
-- **Hemmeligheten stemmer ikke.** Egenskapen og feltet på oppsettssiden må være like, uten mellomrom på slutten.
-- **Tilkoblingen svarer med en innloggingsside.** Distribusjonen er ikke satt til «Alle», eller du åpnet redigeringsadressen (`/dev`) i stedet for `/exec`.
-- **Ingen mappe i Drive.** Test tilkoblingen, generer en kode, og se i roten av Min disk etter `Mennesker`. En annen `ROOT_FOLDER_ID` flytter hele treet.
-- **Opplastingen feiler etter en gyldig kode.** Den lokale XLSX-filen er likevel lastet ned. Det er den som gjelder hvis Drive ikke fikk filen.
-- **Store bilder.** Oppsett med mange innebygde data-URL-er kan bli for store for ett kall. Bruk det innebygde symbolsettet på nett, eller kjør økten frakoblet.
+## 6. Når koden i Apps Script endres senere
+
+1. Lim inn den nye `Code.gs` og lagre.
+2. Klikk **Distribuer** → **Administrer distribusjoner**.
+3. Velg blyanten ved web-appen.
+4. Under **Versjon**, velg **Ny versjon**.
+5. Klikk **Distribuer**.
+
+`/exec`-adressen er den samme. Du trenger ikke ny lenke i `lagring.json` hvis adressen ikke har endret seg.
+
+## 7. Frakoblet kjøring
+
+`npm run build:offline` lager `dist-offline/index.html`. Filen åpnes fra en USB-pinne uten nett og uten innlogging. Bruk **Fortsett uten nett** hvis innloggingsskjermen vises, og deretter **Start økt på denne maskinen**. Resultatene lastes ned til maskinen. De sendes ikke til Drive.
+
+## 8. Hvis noe feiler
+
+- **Eksperimentator er ikke satt opp.** Kjør `installerEksperimentator` etter at brukernavn og passord er lagt inn som skriptegenskaper.
+- **Feil brukernavn eller passord.** Egenskapene ble slettet da funksjonen kjørte. Bruk det passordet du satte, ikke et nytt, med mindre du kjører funksjonen på nytt.
+- **Logg inn på nytt.** Økttokenen varer i seks timer. Logg inn igjen.
+- **Tilkoblingen viser en innloggingsside for Google.** Distribusjonen er ikke satt til **Alle**, eller du limte inn `/dev`-adressen.
+- **Lenken virker på din PC, men ikke på en annen.** `public/lagring.json` mangler `/exec`-adressen, eller den er ikke publisert til `main` ennå.
+- **Ingen mappe i Drive.** Lagre et eksperiment mens du er innlogget, la en deltaker fullføre, og se etter `Mennesker` eller `Boter-AI` i roten av Min disk.

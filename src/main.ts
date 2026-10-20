@@ -11,7 +11,9 @@ let cleanup: () => void = () => undefined;
 function route(): void {
   cleanup();
   const hash = location.hash;
-  if (hash.startsWith('#/deltaker') || hash.startsWith('#/kode/')) cleanup = mountParticipant(root as HTMLElement);
+  if (hash.startsWith('#/deltaker') || hash.startsWith('#/kode/') || hash.startsWith('#/delta')) {
+    cleanup = mountParticipant(root as HTMLElement);
+  }
   else if (hash.startsWith('#/symboler')) cleanup = mountSymbols(root as HTMLElement);
   else cleanup = mountExperimenter(root as HTMLElement);
 }
