@@ -6,7 +6,7 @@ Etterpå virker en deltakerlenke på en hvilken som helst PC:
 
 `https://jonmagnus83.github.io/mts-equivalence/#/delta?k=KODEN`
 
-Koden utløper etter 24 timer. Apps Script lagrer bare en SHA-256-hash av koden, et tilfeldig deltakernummer på minst fem sifre, og oppsettet. Flere deltakere kan kjøre samtidig. Hver kode er sin egen økt.
+Koden er gyldig i 6 timer fra første gang den åpnes, ikke fra den ble laget. Apps Script lagrer tidspunktet for første åpning, en SHA-256-hash av koden, et tilfeldig deltakernummer på minst fem sifre, og oppsettet. Flere deltakere kan kjøre samtidig. Hver kode er sin egen økt.
 
 Resultatene legges i
 
@@ -83,7 +83,7 @@ Filen inneholder ingen hemmelighet. Den som har tilgang til GitHub, lagrer filen
 
 `https://jonmagnus83.github.io/mts-equivalence/#/delta?k=ABCD-2345`
 
-5. Hver nye deltaker trenger et nytt klikk, og får sin egen kode og sitt eget nummer. Koden virker i 24 timer.
+5. Hver nye deltaker trenger et nytt klikk, og får sin egen kode og sitt eget nummer. Koden virker i 6 timer fra første åpning.
 
 **Hent resultatliste** viser deltakernumrene. **CSV** laster ned resultatfilen når økten er levert.
 

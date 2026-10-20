@@ -265,7 +265,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             ${num('correctionMaxRepeats', 'Maks gjentakelser per feil', config.correctionMaxRepeats, 1, 30)}
             <label class="check"><input id="serialIntroduction" type="checkbox" ${config.serialIntroduction ? 'checked' : ''}/> Gradvis innføring, én relasjon om gangen</label>
           </div>
-          <p class="hint">Nedtrappingen gjelder tilbakemelding etter riktig svar. Tekst etter feil følger valget over.</p>
+          <p class="hint">Nedtrappingen gjelder både riktig svar og «Feil». Forsøk uten programmert tilbakemelding går rett til intervallet.</p>
         </section>
         <section class="card">
           <h2><span class="num">3</span> Presentasjon og test</h2>
@@ -278,6 +278,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             </label>
             ${num('delaySeconds', 'Forsinkelse, sekunder', config.delaySeconds, 0, 60)}
             ${num('itiSeconds', 'ITI, sekunder', config.itiSeconds, 0, 30, '0.1')}
+            ${num('inactivityMinutes', 'Inaktivitet før påminnelse, minutter', config.inactivityMinutes, 1, 180)}
             ${num('sampleClicks', 'Klikk på utvalg (0 = vises samtidig)', config.sampleClicks, 0, 10)}
             <label class="field">Posisjoner
               <select id="positionBalance">
@@ -298,7 +299,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
         </section>
         <section class="card">
           <h2><span class="num">4</span> Deltakerkoder</h2>
-          <p class="hint">Lagring oppretter en kode i Apps Script. Lenken virker på en annen PC i 24 timer. Bare en hash lagres. Flere deltakere kan kjøre samtidig, hver med sin kode.</p>
+          <p class="hint">Lagring oppretter en kode i Apps Script. Den virker i 6 timer fra første åpning, på den PC-en som åpnet den. Bare en hash lagres. Flere deltakere kan kjøre samtidig.</p>
           <div class="actions">
             <button type="button" class="solid" id="make-code">Lagre eksperiment og hent lenke</button>
             <button type="button" class="ghost" id="start-here">Start økt på denne maskinen</button>
@@ -516,7 +517,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       codes.push(stored);
       saveCodes(codes);
       readyLink = participantLink(code);
-      message = `Kode ${formatCode(code)}. Deltakernummer ${participantNumber}. Utløper ${expiresAt ? new Date(expiresAt).toLocaleString('nb-NO') : 'om 24 timer'}.`;
+      message = `Kode ${formatCode(code)}. Deltakernummer ${participantNumber}. Gyldig i 6 timer fra første åpning.`;
       refreshBits();
     } catch (error) {
       message = error instanceof Error ? error.message : 'Kunne ikke lagre eksperimentet.';

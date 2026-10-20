@@ -23,7 +23,7 @@ npm run dev
 3. Velg LS, OTM eller MTO. Relasjoner, symmetri, transitivitet og ekvivalens regnes ut fra strukturen.
 4. La mestringskriteriet stå på 17/18. Blokken gjentas med ny rekkefølge og nye posisjoner til kriteriet er nådd.
 5. Nedtrappingen er 100, 75, 50 og 0 prosent. Andelen rundes til nærmeste hele forsøk, så 75 prosent av 18 er 14. Nedtrappingen gjelder riktige svar. «Feil» følger innstillingen under og trappes ikke ned.
-6. Standard etter feil er litteraturinnstillingen: ordet «Feil» i 2 sekunder, og korreksjon er på. Samme relasjon gjentas til svaret er riktig, eller til maksgrensen. Det første feilsvaret teller fortsatt med i kriteriet.
+6. Standard etter feil er litteraturinnstillingen: ordet «Feil» i 2 sekunder, på samme nedtrapping som riktig svar, og korreksjon er på. Samme relasjon gjentas til svaret er riktig, eller til maksgrensen. Det første feilsvaret teller mot kriteriet. Senere korreksjonsvisninger logges, men teller ikke med.
 7. Presentasjonen er simultan. Forsinket MTS skjuler utvalget og venter det antall sekunder du setter. ITI er 0,1 sekunder. Ett klikk på utvalget kreves. 0 klikk viser utvalg og sammenligninger samtidig.
 8. Med tre klasser står sammenligningene i tre av fire hjørner. Det tomme hjørnet og hjørnet for riktig svar balanseres i blokken, og riktig svar kan ikke ligge i samme hjørne mer enn to ganger på rad. Med to klasser er to hjørner tomme. Med fire klasser brukes alle fire.
 9. Testen blander symmetri, transitivitet og ekvivalens. Baseline i testen og refleksivitet er av. Test-multiplikatoren er 3. Siden viser hva «over 95 prosent» betyr i antall, og også 17/18-kriteriet fra litteraturen.
@@ -47,7 +47,7 @@ Oppsettssiden ber om brukernavn og passord. De sjekkes i Apps Script, ikke i den
 
 `https://jonmagnus83.github.io/mts-equivalence/#/delta?k=ABCD-2345`
 
-Koden utløper etter 24 timer. Apps Script lagrer bare en hash, og trekker et deltakernummer på minst fem sifre. Samme lenke åpner det samme eksperimentet på en annen PC. Flere deltakere kan kjøre samtidig.
+Koden er gyldig i 6 timer fra første åpning. Apps Script lagrer bare en hash, og trekker et deltakernummer på minst fem sifre. Samme nettleser kan fortsette der den slapp i det vinduet. En annen nettleser starter forfra og arver ikke pågående forsøk. Flere deltakere kan kjøre samtidig.
 
 Uten Apps Script virker bare **Start økt på denne maskinen**. Det er også veien for den frakoblede filen. Se [docs/apps-script-oppsett.md](docs/apps-script-oppsett.md).
 

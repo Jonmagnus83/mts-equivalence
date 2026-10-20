@@ -128,8 +128,9 @@ describe('codes', () => {
 
     const now = Date.parse('2026-10-20T12:00:00.000Z');
     const exp = expiryFrom(now);
-    expect(Date.parse(exp) - now).toBe(24 * 60 * 60 * 1000);
-    expect(isExpired(exp, now + 24 * 60 * 60 * 1000)).toBe(true);
+    expect(Date.parse(exp) - now).toBe(6 * 60 * 60 * 1000);
+    expect(isExpired(exp, now + 6 * 60 * 60 * 1000)).toBe(true);
+    expect(isExpired('', now)).toBe(false);
     expect(isExpired(exp, now + 1000)).toBe(false);
   });
 });

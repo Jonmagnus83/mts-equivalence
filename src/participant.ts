@@ -1,4 +1,4 @@
-import { hashCode, isExpired, normalizeCode, parseParticipantCode } from './codes';
+import { EXPIRED_CODE_MESSAGE, hashCode, isExpired, normalizeCode, parseParticipantCode } from './codes';
 import { instructionText, parseConfig } from './config';
 import { buildExport } from './export';
 import { cryptoSeed, mulberry32 } from './rng';
@@ -15,6 +15,7 @@ import {
   loadCodes,
   loadLocalRun,
   resolveEndpoint,
+  rememberOpen,
   saveActiveSession,
   saveCodes,
   uploadResults,
@@ -31,6 +32,8 @@ export function mountParticipant(root: HTMLElement): () => void {
   };
   let session: Session | null = null;
   let timer = 0;
+  let idleTimer = 0;
+  let idleKey = '';
   let phase: Phase = 'code';
   let uiLanguage: 'no' | 'en' = 'no';
   let languageChosen = false;
@@ -60,6 +63,34 @@ export function mountParticipant(root: HTMLElement): () => void {
     const wait = session?.pendingWaitMs();
     if (wait === null || wait === undefined) return;
     timer = window.setTimeout(() => session?.completeWait(), wait);
+  };
+
+  const armIdle = () => {
+    const screen = session?.screen;
+    const waiting = screen?.type === 'sample' || screen?.type === 'choice';
+    if (!session || session.finished || !waiting) {
+      window.clearTimeout(idleTimer);
+      idleKey = '';
+      return;
+    }
+    const key = `${screen.type}:${session.trials.length}`;
+    if (key === idleKey) return;
+    idleKey = key;
+    window.clearTimeout(idleTimer);
+    const minutes = configHolder.config?.inactivityMinutes ?? 10;
+    idleTimer = window.setTimeout(() => {
+      idleKey = '';
+      session?.noteInactivity();
+    }, minutes * 60 * 1000);
+  };
+
+  const withinOpenWindow = (serverOpenedAt?: string, serverExpiresAt?: string): boolean => {
+    const window = rememberOpen(configHolder.hash, serverOpenedAt, serverExpiresAt);
+    if (!isExpired(window.expiresAt, Date.now())) return true;
+    codeError = EXPIRED_CODE_MESSAGE;
+    phase = 'code';
+    configHolder.config = null;
+    return false;
   };
 
   const finishIfNeeded = () => {
@@ -121,6 +152,7 @@ export function mountParticipant(root: HTMLElement): () => void {
   const sync = () => {
     persist();
     arm();
+    armIdle();
     finishIfNeeded();
     render();
   };
@@ -223,6 +255,14 @@ export function mountParticipant(root: HTMLElement): () => void {
       return;
     }
     if (screen.type === 'pause') {
+      if (screen.reason === 'inactivity') {
+        root.innerHTML = `<div class="stage"><div class="panel card-copy">
+          <h1>Er du fortsatt der? Trykk Fortsett for å gå videre.</h1>
+          <div class="row-buttons"><button type="button" class="solid" id="continue-idle">${en ? 'Continue' : 'Fortsett'}</button></div>
+        </div></div>`;
+        root.querySelector('#continue-idle')?.addEventListener('click', () => session?.resume());
+        return;
+      }
       const message = screen.reason === 'fullscreen'
         ? (en ? 'Go back to fullscreen. Click anywhere.' : 'Gå tilbake til fullskjerm. Klikk hvor som helst.')
         : (en ? 'Come back to this tab. Click anywhere to continue.' : 'Gå tilbake til fanen. Klikk hvor som helst for å fortsette.');
@@ -301,7 +341,7 @@ export function mountParticipant(root: HTMLElement): () => void {
       root.querySelector('#start-stage')?.addEventListener('click', (event) => {
         const target = event.target as HTMLElement;
         if (target.closest('button')) return;
-        void begin(false);
+        void begin(canResume);
       });
       return;
     }
@@ -348,11 +388,23 @@ export function mountParticipant(root: HTMLElement): () => void {
     if (endpoint.scriptUrl) {
       try {
         const result = await getScript(endpoint.scriptUrl, { action: 'redeem', hash });
+        if (result.expired === true || result.error === 'utløpt') {
+          codeError = EXPIRED_CODE_MESSAGE;
+          phase = 'code';
+          render();
+          return;
+        }
         if (result.ok === true) {
+          configHolder.hash = hash;
+          const serverOpened = typeof result.openedAt === 'string' ? result.openedAt : undefined;
+          const serverExpires = typeof result.expiresAt === 'string' ? result.expiresAt : undefined;
+          if (!withinOpenWindow(serverOpened, serverExpires)) {
+            render();
+            return;
+          }
           configHolder.config = parseConfig(result.config);
           if (languageChosen) configHolder.config.language = uiLanguage;
           configHolder.number = Number(result.participantNumber);
-          configHolder.hash = hash;
           phase = 'instruction';
           codeError = '';
           render();
@@ -375,20 +427,19 @@ export function mountParticipant(root: HTMLElement): () => void {
     }
     const local = loadCodes().find((item) => item.hash === hash);
     if (local) {
-      if (isExpired(local.expiresAt, Date.now())) {
-        codeError = 'Koden er utløpt.';
+      if (local.completed) {
+        codeError = 'Koden er allerede brukt.';
         render();
         return;
       }
-      if (local.completed) {
-        codeError = 'Koden er allerede brukt.';
+      configHolder.hash = hash;
+      if (!withinOpenWindow()) {
         render();
         return;
       }
       configHolder.config = parseConfig(local.config);
       if (languageChosen) configHolder.config.language = uiLanguage;
       configHolder.number = local.participantNumber;
-      configHolder.hash = hash;
       phase = 'instruction';
       codeError = '';
       render();
@@ -421,6 +472,7 @@ export function mountParticipant(root: HTMLElement): () => void {
   boot();
   return () => {
     window.clearTimeout(timer);
+    window.clearTimeout(idleTimer);
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
     root.innerHTML = '';
   };

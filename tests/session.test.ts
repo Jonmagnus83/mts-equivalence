@@ -110,6 +110,8 @@ describe('session', () => {
     const programmed = session.trials.filter((trial) => trial.fase === 'trening' && trial.korreksjonsforsøk === 0);
     expect(programmed).toHaveLength(6);
     expect(programmed.filter((trial) => trial.riktig === 1)).toHaveLength(5);
+    expect(programmed.filter((trial) => trial.riktig === 0)).toHaveLength(1);
+    expect(session.trials.filter((trial) => trial.fase === 'trening' && trial.korreksjonsforsøk === 1).length).toBeGreaterThan(0);
     expect(session.trials.some((trial) => trial.fase === 'test' || session.screen.type === 'sample' || session.screen.type === 'choice')).toBe(true);
   });
 
@@ -121,6 +123,42 @@ describe('session', () => {
     const training = session.trials.filter((trial) => trial.fase === 'trening');
     expect(training).toHaveLength(6);
     expect(training.filter((trial) => trial.tilbakemelding_gitt === 1)).toHaveLength(feedbackCount(6, 50));
+  });
+
+  it('thins wrong-answer feedback on the same schedule as correct answers', () => {
+    const config = tinyConfig({
+      thinning: [50],
+      correction: false,
+      wrongFeedback: 'feil',
+      feedbackDurationMs: 0,
+      masteryNumerator: 0,
+      masteryDenominator: 6,
+    });
+    const session = new Session(config, 10432, mulberry32(5), () => Date.parse('2026-10-20T08:00:00.000Z'));
+    session.start();
+    runBlock(session, Array.from({ length: 6 }, () => false));
+    const training = session.trials.filter((trial) => trial.fase === 'trening' && trial.korreksjonsforsøk === 0);
+    const told = training.filter((trial) => trial.tilbakemelding_gitt === 1);
+    expect(training).toHaveLength(6);
+    expect(told).toHaveLength(feedbackCount(6, 50));
+    expect(told.every((trial) => trial.tilbakemeldingsord === 'Feil')).toBe(true);
+    expect(training.filter((trial) => trial.tilbakemelding_gitt === 0).every((trial) => trial.tilbakemeldingsord === '')).toBe(true);
+  });
+
+  it('logs an inactivity pause and its duration', () => {
+    const config = tinyConfig();
+    let clock = Date.parse('2026-10-20T08:00:00.000Z');
+    const session = new Session(config, 10433, mulberry32(6), () => clock);
+    session.start();
+    expect(session.screen.type).toBe('sample');
+    session.noteInactivity();
+    expect(session.screen.type).toBe('pause');
+    if (session.screen.type === 'pause') expect(session.screen.reason).toBe('inactivity');
+    clock += 12_000;
+    session.resume();
+    const event = session.events.find((item) => item.hendelse === 'inaktivitet');
+    expect(event?.varighet_ms).toBe(12_000);
+    expect(session.screen.type).toBe('sample');
   });
 
   it('logs tab hide and a close attempt', () => {

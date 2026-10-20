@@ -34,13 +34,18 @@ export async function hashCode(code: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export const CODE_TTL_MS = 24 * 60 * 60 * 1000;
+/** A code lasts 6 hours from the first time it is opened, not from when it was created. */
+export const CODE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export const EXPIRED_CODE_MESSAGE =
+  'Denne koden er ikke lenger gyldig. Den virket i seks timer fra første gang den ble åpnet. Be eksperimentatoren om en ny lenke.';
 
 export function expiryFrom(nowMs: number): string {
   return new Date(nowMs + CODE_TTL_MS).toISOString();
 }
 
 export function isExpired(expiresAtIso: string, nowMs: number): boolean {
+  if (!expiresAtIso) return false;
   const t = Date.parse(expiresAtIso);
   return Number.isNaN(t) || t <= nowMs;
 }

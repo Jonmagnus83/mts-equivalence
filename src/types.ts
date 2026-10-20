@@ -45,6 +45,8 @@ export interface ExperimentConfig {
   itiSeconds: number;
   /** Observing responses on the sample. 0 shows sample and comparisons together. */
   sampleClicks: number;
+  /** Minutes without a response before the participant is asked to continue. */
+  inactivityMinutes: number;
   positionBalance: PositionMode;
   maxConsecutiveSPlus: number;
   testSymmetry: boolean;
@@ -127,7 +129,8 @@ export type SessionEventName =
   | 'visible'
   | 'fullskjerm_av'
   | 'fullskjerm_på'
-  | 'forsøk_på_lukking';
+  | 'forsøk_på_lukking'
+  | 'inaktivitet';
 
 export interface EventRecord {
   tidspunkt_ms: number;

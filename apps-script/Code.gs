@@ -18,7 +18,8 @@
 var SESSION_TTL_SEC = 21600;
 var CODE_ALPHABET_ = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-var CODE_HEADERS = ['hash', 'participantNumber', 'project', 'middle', 'expiresAt', 'createdAt', 'completed', 'configFileId'];
+var CODE_HEADERS = ['hash', 'participantNumber', 'project', 'middle', 'expiresAt', 'createdAt', 'completed', 'configFileId', 'openedAt'];
+var OPEN_TTL_MS_ = 6 * 60 * 60 * 1000;
 
 function doGet(e) {
   return handle_(e && e.parameter ? e.parameter : {});
@@ -117,17 +118,19 @@ function register_(body) {
   var participantNumber = freshNumber_(used);
   var project = safeName_(body.project || 'mts');
   var middle = allowedMiddle_(body.middle);
-  var expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  ensureOpenedColumn_(sheet);
   var configFolder = childFolder_(registryFolder_(), 'oppsett');
   var configFile = configFolder.createFile(
     Utilities.newBlob(JSON.stringify(body.config || {}), 'application/json', hash + '.json')
   );
-  sheet.appendRow([hash, participantNumber, project, middle, expiresAt, new Date().toISOString(), '0', configFile.getId()]);
+  sheet.appendRow([hash, participantNumber, project, middle, '', new Date().toISOString(), '0', configFile.getId(), '']);
   return {
     ok: true,
     code: code.slice(0, 4) + '-' + code.slice(4),
     participantNumber: participantNumber,
-    expiresAt: expiresAt,
+    openedAt: '',
+    expiresAt: '',
+    validForHoursAfterOpen: 6,
   };
 }
 
@@ -176,11 +179,19 @@ function redeem_(hash) {
   var row = findHash_(sheet, hash);
   if (!row) return { ok: false, error: 'Ukjent eller utløpt kode.' };
   if (row.completed === '1' || row.completed === 1) return { ok: false, error: 'Koden er allerede brukt.' };
+  row = stampOpen_(sheet, row);
+  if (!row) return { ok: false, error: 'utløpt', expired: true };
   var config = {};
   if (row.configFileId) {
     config = JSON.parse(DriveApp.getFileById(row.configFileId).getBlob().getDataAsString());
   }
-  return { ok: true, participantNumber: Number(row.participantNumber), config: config, expiresAt: row.expiresAt };
+  return {
+    ok: true,
+    participantNumber: Number(row.participantNumber),
+    config: config,
+    openedAt: row.openedAt,
+    expiresAt: row.expiresAt,
+  };
 }
 
 function submit_(body) {
@@ -189,6 +200,7 @@ function submit_(body) {
   cleanupSheet_(sheet);
   var row = findHash_(sheet, hash);
   if (!row) return { ok: false, error: 'Ukjent eller utløpt kode.' };
+  if (isOpenExpired_(row)) return { ok: false, error: 'utløpt', expired: true };
   if (row.completed === '1' || row.completed === 1) return { ok: false, error: 'Koden er allerede brukt.' };
   var middle = allowedMiddle_(row.middle || body.middle);
   var project = safeName_(row.project || body.project || 'mts');
@@ -253,13 +265,52 @@ function codeBook_() {
 function findHash_(sheet, hash) {
   var values = sheet.getDataRange().getValues();
   if (values.length < 2) return null;
+  var headers = values[0];
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][0]).toLowerCase() !== hash) continue;
     var row = { _index: i + 1 };
-    for (var c = 0; c < CODE_HEADERS.length; c++) row[CODE_HEADERS[c]] = values[i][c];
+    for (var c = 0; c < headers.length; c++) {
+      if (headers[c]) row[String(headers[c])] = values[i][c];
+    }
     return row;
   }
   return null;
+}
+
+function ensureOpenedColumn_(sheet) {
+  var last = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, last).getValues()[0];
+  if (headers.indexOf('openedAt') !== -1) return;
+  sheet.getRange(1, last + 1).setValue('openedAt');
+}
+
+function columnNumber_(sheet, name) {
+  var last = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, last).getValues()[0];
+  var index = headers.indexOf(name);
+  return index === -1 ? 0 : index + 1;
+}
+
+/** First redeem starts a 6-hour window. A later redeem after that window is rejected. */
+function stampOpen_(sheet, row) {
+  ensureOpenedColumn_(sheet);
+  var now = new Date();
+  if (!row.openedAt) {
+    var expires = new Date(now.getTime() + OPEN_TTL_MS_);
+    sheet.getRange(row._index, columnNumber_(sheet, 'openedAt')).setValue(now.toISOString());
+    sheet.getRange(row._index, columnNumber_(sheet, 'expiresAt')).setValue(expires.toISOString());
+    row.openedAt = now.toISOString();
+    row.expiresAt = expires.toISOString();
+    return row;
+  }
+  if (isOpenExpired_(row)) return null;
+  return row;
+}
+
+function isOpenExpired_(row) {
+  if (!row.openedAt) return false;
+  var exp = Date.parse(row.expiresAt);
+  return !exp || exp <= Date.now();
 }
 
 function setCompleted_(sheet, hash) {

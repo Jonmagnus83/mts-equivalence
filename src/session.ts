@@ -25,7 +25,7 @@ export type Screen =
   | { type: 'choice'; sample: string | null; options: { stimulus: string; corner: Corner }[] }
   | { type: 'feedback'; text: string }
   | { type: 'iti' }
-  | { type: 'pause'; reason: 'hidden' | 'blur' | 'fullscreen' }
+  | { type: 'pause'; reason: 'hidden' | 'blur' | 'fullscreen' | 'inactivity' }
   | { type: 'done' };
 
 interface QueueItem extends PlannedTrial {
@@ -122,6 +122,8 @@ export class Session {
   private heldScreen: Screen | null = null;
   private away: Partial<Record<'blur' | 'hidden' | 'fullskjerm_av', number>> = {};
   private globalTrial = 0;
+  private inactivityStarted: number | null = null;
+  private inactivityEventIndex: number | null = null;
 
   constructor(
     readonly config: ExperimentConfig,
@@ -254,8 +256,25 @@ export class Session {
     this.onChange();
   }
 
+  /** Shown when the participant has not responded within the configured limit. */
+  noteInactivity(): void {
+    if (!this.started || this.finished) return;
+    if (this.screen.type !== 'sample' && this.screen.type !== 'choice') return;
+    this.inactivityStarted = this.now();
+    this.events.push(this.eventRow('inaktivitet', 0));
+    this.inactivityEventIndex = this.events.length - 1;
+    this.pause('inactivity');
+    this.onChange();
+  }
+
   resume(): void {
     if (this.screen.type !== 'pause') return;
+    if (this.screen.reason === 'inactivity' && this.inactivityEventIndex !== null && this.inactivityStarted !== null) {
+      const event = this.events[this.inactivityEventIndex];
+      if (event) event.varighet_ms = Math.max(0, Math.round(this.now() - this.inactivityStarted));
+      this.inactivityStarted = null;
+      this.inactivityEventIndex = null;
+    }
     if (this.pauseStarted !== null) {
       this.pausedMs += this.now() - this.pauseStarted;
       this.pauseStarted = null;
@@ -388,7 +407,7 @@ export class Session {
       const index = Math.floor(this.rng() * words.length);
       return words[index] ?? words[0] ?? '';
     }
-    if (!correct && this.config.wrongFeedback !== 'none') return wrongWord(this.config);
+    if (!correct && trial.feedbackScheduled && this.config.wrongFeedback !== 'none') return wrongWord(this.config);
     return '';
   }
 
@@ -493,7 +512,7 @@ export class Session {
     this.screen = { type: 'done' };
   }
 
-  private pause(reason: 'hidden' | 'blur' | 'fullscreen'): void {
+  private pause(reason: 'hidden' | 'blur' | 'fullscreen' | 'inactivity'): void {
     if (this.screen.type === 'pause' || this.screen.type === 'done') return;
     this.pauseStarted = this.now();
     if (this.pending) {

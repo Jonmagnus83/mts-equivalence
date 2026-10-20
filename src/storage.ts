@@ -1,5 +1,6 @@
 import { buildExport } from './export';
 import { storageFolder } from './folders';
+import { CODE_TTL_MS } from './codes';
 import type { ExperimentConfig, EventRecord, TrialRecord } from './types';
 import type { PersistedSession } from './session';
 
@@ -178,6 +179,37 @@ export function loadSessionToken(): string | null {
 export function saveSessionToken(token: string, expiresInSec: number): void {
   const value: ExperimenterSession = { token, expiresAt: Date.now() + expiresInSec * 1000 };
   write(AUTH_KEY, JSON.stringify(value));
+}
+
+export interface CodeOpen {
+  openedAt: string;
+  expiresAt: string;
+}
+
+/** Remembers the first time this browser opened a code. Another browser has its own empty store. */
+export function rememberOpen(hash: string, serverOpenedAt?: string, serverExpiresAt?: string): CodeOpen {
+  const key = `mts-lab-open-${hash}`;
+  if (serverOpenedAt && serverExpiresAt) {
+    const value = { openedAt: serverOpenedAt, expiresAt: serverExpiresAt };
+    write(key, JSON.stringify(value));
+    return value;
+  }
+  const existing = read(key);
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing) as CodeOpen;
+      if (parsed.openedAt && parsed.expiresAt) return parsed;
+    } catch {
+      /* fall through and stamp now */
+    }
+  }
+  const opened = Date.now();
+  const value = {
+    openedAt: new Date(opened).toISOString(),
+    expiresAt: new Date(opened + CODE_TTL_MS).toISOString(),
+  };
+  write(key, JSON.stringify(value));
+  return value;
 }
 
 export function clearSessionToken(): void {

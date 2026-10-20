@@ -57,6 +57,7 @@ export function parameterColumns(config: ExperimentConfig): Record<string, strin
     par_forsinkelse_s: config.delaySeconds,
     par_iti_s: config.itiSeconds,
     par_klikk_utvalg: config.sampleClicks,
+    par_inaktivitet_min: config.inactivityMinutes,
     par_posisjon: config.positionBalance,
     par_maks_splus_rad: config.maxConsecutiveSPlus,
     par_test_symmetri: config.testSymmetry ? 1 : 0,
