@@ -123,6 +123,7 @@ export interface ExportBundle {
   csv: string;
   eventsCsv: string;
   parameters: ParameterRow[];
+  rows: Record<string, string | number>[];
 }
 
 export function buildExport(
@@ -149,12 +150,14 @@ export function buildExport(
   const summary = summaryRows(participantNumber, config, trials, events);
   XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(summary), 'Oppsummering');
   const xlsx = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  const rows = data.length > 0 ? data : [emptyDataRow(config)];
   return {
     filenameBase: String(participantNumber),
     xlsx: new Uint8Array(xlsx),
-    csv: toCsv(data.length > 0 ? data : [emptyDataRow(config)]),
+    csv: toCsv(rows),
     eventsCsv: toCsv(eventRows),
     parameters,
+    rows,
   };
 }
 

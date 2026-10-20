@@ -188,10 +188,8 @@ export function assignPositions(
       // empty corner; the second unused corner is simply not in placements.
       if (nComp === 2) {
         const secondEmpty = perm[2] as number;
-        const assignment = place(trial, sPlusIndex, emptyIndex, rng);
-        // Drop the comparison that landed on the second empty corner, if any,
-        // by rebuilding with both empties excluded.
-        return placeTwoEmpty(trial, sPlusIndex, emptyIndex, secondEmpty, rng) ?? assignment;
+        const firstEmpty = perm[1] as number;
+        return placeTwoEmpty(trial, sPlusIndex, firstEmpty, secondEmpty, rng);
       }
       return place(trial, sPlusIndex, emptyIndex, rng);
     });
