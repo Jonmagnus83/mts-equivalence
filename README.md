@@ -75,7 +75,7 @@ Noen nettlesere spør før de tillater flere nedlastinger. Excel-filen kommer f�
 
 Arbeidsflyten ligger i `.github/workflows/pages.yml`. Den kjører testene, bygger med base-adresse `/mts-equivalence/` og laster opp `dist/`.
 
-Arbeidsflyten slår på Pages selv (`actions/configure-pages` med `enablement: true`) når den kjører på `main`. Siden blir `https://jonmagnus83.github.io/mts-equivalence/`.
+Arbeidsflyten prøver å slå på Pages selv (`actions/configure-pages` med `enablement: true`). `GITHUB_TOKEN` får ikke lov til å opprette nettstedet. Første gang må en administrator sette **Settings → Pages → Source: GitHub Actions**, eller gi arbeidsflyten et token som ikke er `GITHUB_TOKEN`, med `pages: write` og `administration: write`. Etter det deployer arbeidsflyten selv til `https://jonmagnus83.github.io/mts-equivalence/`.
 
 Før den adressen deles med deltakere: legg Apps Script-adressen i `public/lagring.json` og bygg på nytt, hvis resultatene skal til Drive. Hemmeligheten skal ikke stå i den filen.
 
