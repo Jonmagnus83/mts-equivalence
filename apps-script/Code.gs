@@ -7,7 +7,8 @@
  *
  * Script properties:
  *   EXPERIMENTER_SECRET  required for register
- *   MIDDLE_FOLDER        default "Mennesker" (use "Boter-AI" if that is the Drive folder)
+ *   The result folder is chosen in the app: Mennesker or Boter-AI.
+ *   MIDDLE_FOLDER is ignored for that choice. The code registry lives in MTS-koder.
  *   ROOT_FOLDER_ID       optional. Empty means the root of the owner's Drive.
  */
 
@@ -71,7 +72,7 @@ function register_(body) {
   var project = safeName_(body.project || 'mts');
   var middle = allowedMiddle_(body.middle);
   var expiresAt = body.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  var configFolder = childFolder_(childFolder_(middleFolder_(middle), '_koder'), 'oppsett');
+  var configFolder = childFolder_(registryFolder_(), 'oppsett');
   var configFile = configFolder.createFile(
     Utilities.newBlob(JSON.stringify(body.config || {}), 'application/json', hash + '.json')
   );
@@ -100,7 +101,7 @@ function submit_(body) {
   var row = findHash_(sheet, hash);
   if (!row) return { ok: false, error: 'Ukjent eller utløpt kode.' };
   if (row.completed === '1' || row.completed === 1) return { ok: false, error: 'Koden er allerede brukt.' };
-  var middle = row.middle || allowedMiddle_(body.middle);
+  var middle = allowedMiddle_(row.middle || body.middle);
   var project = safeName_(row.project || body.project || 'mts');
   var participantNumber = String(row.participantNumber);
   var folder = childFolder_(childFolder_(middleFolder_(middle), project), participantNumber);
@@ -147,7 +148,7 @@ function cleanupSheet_(sheet) {
 }
 
 function codeBook_() {
-  var folder = childFolder_(middleFolder_(prop_('MIDDLE_FOLDER') || 'Mennesker'), '_koder');
+  var folder = registryFolder_();
   var files = folder.getFilesByName('MTS-koder');
   while (files.hasNext()) {
     var file = files.next();
@@ -198,16 +199,17 @@ function middleFolder_(name) {
   return childFolder_(root, safeName_(name || prop_('MIDDLE_FOLDER') || 'Mennesker'));
 }
 
+function registryFolder_() {
+  var rootId = prop_('ROOT_FOLDER_ID');
+  var root = rootId ? DriveApp.getFolderById(rootId) : DriveApp.getRootFolder();
+  return childFolder_(root, 'MTS-koder');
+}
+
+/** The app sends Mennesker or Boter-AI. That string is the Drive folder name. */
 function allowedMiddle_(requested) {
-  var fallback = prop_('MIDDLE_FOLDER') || 'Mennesker';
-  var raw = prop_('ALLOWED_MIDDLE') || fallback;
-  var allowed = raw.split(',').map(function (part) { return part.trim(); }).filter(String);
-  if (!allowed.length) allowed = [fallback];
   var wanted = String(requested || '').trim();
-  for (var i = 0; i < allowed.length; i++) {
-    if (allowed[i] === wanted) return allowed[i];
-  }
-  return allowed[0];
+  if (wanted === 'Boter-AI' || wanted === 'Mennesker') return wanted;
+  return 'Mennesker';
 }
 
 function childFolder_(parent, name) {

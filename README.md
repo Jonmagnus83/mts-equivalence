@@ -18,7 +18,7 @@ npm run dev
 
 ## Slik settes et forsøk opp
 
-1. Velg studie-ID. Den blir mappenavnet i Drive.
+1. Velg studie-ID. Den blir prosjektmappen i Drive. På kort 5 velger du lagringsmappen Mennesker eller Boter-AI. Valget sendes til Apps Script.
 2. Velg klasser (2–4, standard 3) og medlemmer per klasse (3–8, standard 3).
 3. Velg LS, OTM eller MTO. Relasjoner, symmetri, transitivitet og ekvivalens regnes ut fra strukturen.
 4. La mestringskriteriet stå på 17/18. Blokken gjentas med ny rekkefølge og nye posisjoner til kriteriet er nådd.

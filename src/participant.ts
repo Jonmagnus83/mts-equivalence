@@ -20,7 +20,6 @@ import {
   uploadResults,
 } from './storage';
 import type { ExperimentConfig } from './types';
-import { shell } from './shell';
 
 type Phase = 'code' | 'instruction' | 'run';
 
@@ -185,10 +184,10 @@ export function mountParticipant(root: HTMLElement): () => void {
     if (!config) return;
     const en = config.language === 'en';
     if (screen.type === 'sample') {
-      root.innerHTML = `<div class="stage sample-only">${renderFigure(screen.stimulus).replace(
+      root.innerHTML = `<div class="stage sample-only"><div class="panel">${renderFigure(screen.stimulus).replace(
         'class="figure"',
         'class="figure sample-slot"',
-      )}</div>`;
+      )}</div></div>`;
       root.querySelector('.sample-slot')?.addEventListener('click', () => session?.clickSample());
       return;
     }
@@ -202,7 +201,7 @@ export function mountParticipant(root: HTMLElement): () => void {
       const sample = screen.sample
         ? renderFigure(screen.sample).replace('class="figure"', 'class="figure sample-slot"')
         : '';
-      root.innerHTML = `<div class="stage choice">${sample}${corners}</div>`;
+      root.innerHTML = `<div class="stage choice"><div class="panel">${sample}${corners}</div></div>`;
       if (screen.sample) {
         root.querySelector('.sample-slot')?.addEventListener('click', () => session?.clickSample());
       }
@@ -216,7 +215,7 @@ export function mountParticipant(root: HTMLElement): () => void {
       return;
     }
     if (screen.type === 'feedback') {
-      root.innerHTML = `<div class="stage"><div class="feedback-word">${escapeText(screen.text)}</div></div>`;
+      root.innerHTML = `<div class="stage"><div class="panel feedback-card"><p class="feedback-word">${escapeText(screen.text)}</p></div></div>`;
       return;
     }
     if (screen.type === 'delay' || screen.type === 'iti') {
@@ -227,7 +226,7 @@ export function mountParticipant(root: HTMLElement): () => void {
       const message = screen.reason === 'fullscreen'
         ? (en ? 'Go back to fullscreen. Click anywhere.' : 'Gå tilbake til fullskjerm. Klikk hvor som helst.')
         : (en ? 'Come back to this tab. Click anywhere to continue.' : 'Gå tilbake til fanen. Klikk hvor som helst for å fortsette.');
-      root.innerHTML = `<div class="stage"><div class="pause-screen"><h1>${message}</h1></div></div>`;
+      root.innerHTML = `<div class="stage"><div class="panel card-copy"><h1>${message}</h1></div></div>`;
       root.querySelector('.stage')?.addEventListener('click', () => {
         void (async () => {
           if (!document.fullscreenElement) {
@@ -243,7 +242,7 @@ export function mountParticipant(root: HTMLElement): () => void {
       return;
     }
     if (screen.type === 'done') {
-      root.innerHTML = `<div class="stage"><div class="done-screen">
+      root.innerHTML = `<div class="stage"><div class="panel card-copy">
         <h1>${en ? 'Thank you. The task is finished.' : 'Takk. Oppgaven er ferdig.'}</h1>
         <p>${escapeText(uploadNote || (en ? 'A copy is being downloaded to this computer.' : 'En kopi lastes ned til denne maskinen.'))}</p>
         <div class="row-buttons">
@@ -278,11 +277,11 @@ export function mountParticipant(root: HTMLElement): () => void {
           <button type="button" data-lang="no" aria-pressed="${config.language === 'no'}">Norsk</button>
           <button type="button" data-lang="en" aria-pressed="${config.language === 'en'}">English</button>
         </div>
-        <div class="instruction" id="instruction"></div>
-        ${canResume ? `<div class="row-buttons" style="position:absolute;bottom:8vh;left:0;right:0;justify-content:center">
-          <button type="button" class="ghost" id="resume">${en ? 'Continue the unfinished session' : 'Fortsett den uferdige økten'}</button>
-        </div>` : ''}
-        ${codeError ? `<p class="warn" style="position:absolute;bottom:4vh;left:0;right:0;text-align:center">${escapeText(codeError)}</p>` : ''}
+        <div class="panel instruction-card">
+          <div class="instruction" id="instruction"></div>
+          ${canResume ? `<div class="row-buttons"><button type="button" class="ghost" id="resume">${en ? 'Continue the unfinished session' : 'Fortsett den uferdige økten'}</button></div>` : ''}
+          ${codeError ? `<p class="warn">${escapeText(codeError)}</p>` : ''}
+        </div>
       </div>`;
       const text = root.querySelector('#instruction');
       if (text) text.textContent = instructionText(config);
@@ -306,20 +305,23 @@ export function mountParticipant(root: HTMLElement): () => void {
       });
       return;
     }
-    root.innerHTML = `${shell('deltaker')}<div class="stage loose"><div class="code-screen">
-      <div class="lang">
-        <button type="button" data-lang="no" aria-pressed="${uiLanguage === 'no'}">Norsk</button>
-        <button type="button" data-lang="en" aria-pressed="${uiLanguage === 'en'}">English</button>
-      </div>
-      <h1>${en ? 'Enter your code' : 'Skriv inn koden'}</h1>
-      <form id="code-form">
-        <input id="code" name="code" autocomplete="off" autocapitalize="characters" inputmode="text" />
-        <div class="row-buttons" style="justify-content:center">
-          <button class="solid" type="submit">${en ? 'Continue' : 'Fortsett'}</button>
+    root.innerHTML = `<div class="stage loose">
+      <a class="quiet-link" href="#/oppsett">Oppsett</a>
+      <div class="panel card-copy">
+        <div class="lang">
+          <button type="button" data-lang="no" aria-pressed="${uiLanguage === 'no'}">Norsk</button>
+          <button type="button" data-lang="en" aria-pressed="${uiLanguage === 'en'}">English</button>
         </div>
-      </form>
-      ${codeError ? `<p class="warn">${escapeText(codeError)}</p>` : ''}
-    </div></div>`;
+        <h1>${en ? 'Enter your code' : 'Skriv inn koden'}</h1>
+        <form id="code-form">
+          <input id="code" name="code" autocomplete="off" autocapitalize="characters" inputmode="text" />
+          <div class="row-buttons">
+            <button class="solid" type="submit">${en ? 'Continue' : 'Fortsett'}</button>
+          </div>
+        </form>
+        ${codeError ? `<p class="warn">${escapeText(codeError)}</p>` : ''}
+      </div>
+    </div>`;
     root.querySelector('#code-form')?.addEventListener('submit', (event) => {
       event.preventDefault();
       const value = (root.querySelector('#code') as HTMLInputElement | null)?.value ?? '';

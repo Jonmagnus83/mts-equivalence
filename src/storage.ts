@@ -1,4 +1,5 @@
 import { buildExport } from './export';
+import { storageFolder } from './folders';
 import type { ExperimentConfig, EventRecord, TrialRecord } from './types';
 import type { PersistedSession } from './session';
 
@@ -53,7 +54,7 @@ export function loadSettings(): LabSettings {
   return {
     scriptUrl: typeof parsed.scriptUrl === 'string' ? parsed.scriptUrl : '',
     secret: typeof parsed.secret === 'string' ? parsed.secret : '',
-    middle: typeof parsed.middle === 'string' && parsed.middle.trim() ? parsed.middle.trim() : 'Mennesker',
+    middle: storageFolder(parsed.middle),
   };
 }
 
@@ -149,7 +150,7 @@ export async function loadEndpointFile(): Promise<EndpointFile> {
     const parsed = (await response.json()) as Partial<EndpointFile>;
     return {
       scriptUrl: typeof parsed.scriptUrl === 'string' ? parsed.scriptUrl.trim() : '',
-      middle: typeof parsed.middle === 'string' && parsed.middle.trim() ? parsed.middle.trim() : 'Mennesker',
+      middle: storageFolder(parsed.middle),
     };
   } catch {
     return { scriptUrl: '', middle: 'Mennesker' };
@@ -160,7 +161,7 @@ export async function resolveEndpoint(): Promise<EndpointFile & { secret: string
   const [file, settings] = await Promise.all([loadEndpointFile(), Promise.resolve(loadSettings())]);
   return {
     scriptUrl: settings.scriptUrl.trim() || file.scriptUrl,
-    middle: settings.middle.trim() || file.middle || 'Mennesker',
+    middle: storageFolder(settings.middle || file.middle),
     secret: settings.secret,
   };
 }

@@ -1,11 +1,8 @@
-export function shell(current: 'oppsett' | 'deltaker' | 'symboler'): string {
+export function shell(current: 'oppsett' | 'deltaker' | 'symboler', heading = 'MTS-lab'): string {
   const link = (hash: string, id: typeof current, label: string) =>
     `<a href="${hash}" ${current === id ? 'aria-current="page"' : ''}>${label}</a>`;
   return `<header class="top">
-    <div>
-      <h1>MTS-lab</h1>
-      <p>Matching-to-sample</p>
-    </div>
+    <h1>${heading}</h1>
     <nav class="nav">
       ${link('#/oppsett', 'oppsett', 'Oppsett')}
       ${link('#/deltaker', 'deltaker', 'Deltaker')}

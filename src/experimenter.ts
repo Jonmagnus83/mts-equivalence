@@ -1,4 +1,5 @@
 import { expiryFrom, formatCode, generateCode, generateParticipantNumber, hashCode } from './codes';
+import { storageFolder } from './folders';
 import { assignSymbols, parseConfig } from './config';
 import { formatRatio, jonTestRequired, literatureRequired, requiredCorrect } from './criteria';
 import { cryptoSeed, mulberry32 } from './rng';
@@ -80,10 +81,11 @@ export function mountExperimenter(root: HTMLElement): () => void {
       symbolAssignment: config.symbolAssignment,
     });
     config.symbolAssignment = assignSymbols(config);
+    const pressed = root.querySelector<HTMLButtonElement>('.folder-toggle [aria-pressed="true"]');
     settings = {
       scriptUrl: value('scriptUrl').trim(),
       secret: value('secret'),
-      middle: value('middle').trim() || 'Mennesker',
+      middle: storageFolder(pressed?.dataset.folder ?? settings.middle),
     };
     persist();
   };
@@ -160,149 +162,143 @@ export function mountExperimenter(root: HTMLElement): () => void {
         }),
       )
       .join('');
-    root.innerHTML = `${shell('oppsett')}
-      <div class="layout">
-        <form class="form" id="form">
-          <section>
-            <h2>Studie</h2>
-            <div class="fields">
-              ${field('studyId', 'Studie-ID / prosjektmappe', config.studyId)}
-              ${field('groupCode', 'Gruppekode (valgfri, ingen persondata)', config.groupCode)}
-              <label class="field">Språk for deltaker
-                <select id="language">
-                  <option value="no" ${config.language === 'no' ? 'selected' : ''}>Norsk</option>
-                  <option value="en" ${config.language === 'en' ? 'selected' : ''}>Engelsk</option>
-                </select>
-              </label>
-              <label class="field wide">Instruksjon, norsk
-                <textarea id="instructionNo">${escapeText(config.instructionNo)}</textarea>
-              </label>
-              <label class="field wide">Instruksjon, engelsk
-                <textarea id="instructionEn">${escapeText(config.instructionEn)}</textarea>
-              </label>
-            </div>
-          </section>
-          <section>
-            <h2>Stimuli</h2>
-            <div class="fields">
-              <label class="field">Stimulussett
-                <select id="stimulusMode">
-                  <option value="builtin" ${config.stimulusMode === 'builtin' ? 'selected' : ''}>Innebygd svart-hvitt</option>
-                  <option value="upload" ${config.stimulusMode === 'upload' ? 'selected' : ''}>Opplastede bilder</option>
-                </select>
-              </label>
-              ${num('classes', 'Klasser (2–4)', config.classes, 2, 4)}
-              ${num('members', 'Medlemmer per klasse (3–8)', config.members, 3, 8)}
-              <label class="field">Bilder som ett medlemssett
-                <select id="pictureMember">${pictureOptions}</select>
-              </label>
-            </div>
-            <div class="stimuli" id="stimuli">${stimuli()}</div>
-          </section>
-          <section>
-            <h2>Trening</h2>
-            <div class="fields">
-              <label class="field">Treningsstruktur
-                <select id="structure">
-                  <option value="LS" ${config.structure === 'LS' ? 'selected' : ''}>Lineær serie (LS)</option>
-                  <option value="OTM" ${config.structure === 'OTM' ? 'selected' : ''}>One-to-many (OTM)</option>
-                  <option value="MTO" ${config.structure === 'MTO' ? 'selected' : ''}>Many-to-one (MTO)</option>
-                </select>
-              </label>
-              ${num('trialMultiplier', 'Trial-multiplikator', config.trialMultiplier, 1, 20)}
-              ${num('masteryNumerator', 'Mestringskriterium, teller', config.masteryNumerator, 1, 500)}
-              ${num('masteryDenominator', 'Mestringskriterium, nevner', config.masteryDenominator, 1, 500)}
-              ${field('thinning', 'Nedtrapping, prosent', config.thinning.join(', '))}
-              <label class="check"><input id="serialIntroduction" type="checkbox" ${config.serialIntroduction ? 'checked' : ''}/> Gradvis innføring, én relasjon om gangen før nedtrapping</label>
-            </div>
-          </section>
-          <section>
-            <h2>Tilbakemelding</h2>
-            <div class="fields">
-              ${field('feedbackWordsNo', 'Ord ved riktig svar, trekkes tilfeldig', config.feedbackWordsNo.join(', '))}
-              ${num('feedbackDurationMs', 'Varighet, millisekunder', config.feedbackDurationMs, 0, 10000)}
-              <label class="field">Ved feil svar
-                <select id="wrongFeedback">
-                  <option value="none" ${config.wrongFeedback === 'none' ? 'selected' : ''}>Ingenting</option>
-                  <option value="feil" ${config.wrongFeedback === 'feil' ? 'selected' : ''}>«Feil»</option>
-                  <option value="literature" ${config.wrongFeedback === 'literature' ? 'selected' : ''}>Litteraturstandard: «Feil» i 2 s</option>
-                </select>
-              </label>
-              <label class="check"><input id="correction" type="checkbox" ${config.correction ? 'checked' : ''}/> Korreksjonsprosedyre</label>
-              ${num('correctionMaxRepeats', 'Maks gjentakelser per feil', config.correctionMaxRepeats, 1, 30)}
-            </div>
-            <p class="field">Nedtrappingen gjelder tilbakemelding etter riktig svar. Tekst etter feil følger valget over og trappes ikke ned.</p>
-          </section>
-          <section>
-            <h2>Presentasjon</h2>
-            <div class="fields">
-              <label class="field">MTS-type
-                <select id="mtsType">
-                  <option value="simultaneous" ${config.mtsType === 'simultaneous' ? 'selected' : ''}>Simultan</option>
-                  <option value="delayed" ${config.mtsType === 'delayed' ? 'selected' : ''}>Forsinket</option>
-                </select>
-              </label>
-              ${num('delaySeconds', 'Forsinkelse, sekunder', config.delaySeconds, 0, 60)}
-              ${num('itiSeconds', 'ITI, sekunder', config.itiSeconds, 0, 30, '0.1')}
-              ${num('sampleClicks', 'Klikk på utvalg (0 = vises samtidig)', config.sampleClicks, 0, 10)}
-              <label class="field">Posisjoner
-                <select id="positionBalance">
-                  <option value="constrained" ${config.positionBalance === 'constrained' ? 'selected' : ''}>Begrenset</option>
-                  <option value="free" ${config.positionBalance === 'free' ? 'selected' : ''}>Fri</option>
-                </select>
-              </label>
-              ${num('maxConsecutiveSPlus', 'Maks ganger S+ i samme hjørne på rad', config.maxConsecutiveSPlus, 1, 10)}
-            </div>
-          </section>
-          <section>
-            <h2>Test</h2>
-            <div class="fields">
-              ${check('testSymmetry', 'Symmetri', config.testSymmetry)}
-              ${check('testTransitivity', 'Transitivitet', config.testTransitivity)}
-              ${check('testEquivalence', 'Ekvivalens', config.testEquivalence)}
-              ${check('testBaseline', 'Baseline i test', config.testBaseline)}
-              ${check('testReflexivity', 'Refleksivitet', config.testReflexivity)}
-              ${check('reflexivityAsPretest', 'Refleksivitet som forhåndstest', config.reflexivityAsPretest)}
-              ${num('testMultiplier', 'Test-multiplikator', config.testMultiplier, 1, 20)}
-            </div>
-          </section>
-          <section>
-            <h2>Koder og lagring</h2>
-            <div class="fields">
-              ${field('scriptUrl', 'Apps Script-adresse', settings.scriptUrl)}
-              <label class="field">Hemmelighet (lagres bare i denne nettleseren)
-                <input id="secret" type="password" value="${escapeAttr(settings.secret)}" autocomplete="off" />
-              </label>
-              ${field('middle', 'Mappe under Min disk', settings.middle)}
-            </div>
-            <div class="actions">
-              <button type="button" class="solid" id="save-json">Lagre oppsett (JSON)</button>
-              <button type="button" class="ghost" id="load-json">Last oppsett</button>
-              <input id="json-file" type="file" accept="application/json,.json" hidden />
-              <button type="button" class="solid" id="make-code">Generer deltakerkode</button>
-              <button type="button" class="ghost" id="start-here">Start økt på denne maskinen</button>
-              <button type="button" class="ghost" id="ping">Test tilkobling</button>
-              <button type="button" class="ghost" id="endpoint-file">Last ned lagring.json</button>
-            </div>
-            <p id="message">${escapeText(message)}</p>
-            <div id="codes">${codesTable()}</div>
-          </section>
-        </form>
-        <aside class="side">
-          <div class="summary" id="summary"><h2>Denne økten</h2>${summary()}</div>
-          <div class="note">
-            <h2>Fanen</h2>
-            <p>Forsøket går i fullskjerm. Nettleseren varsler hvis deltakeren lukker eller laster siden på nytt. Programmet logger skifte av fane, tapt fokus og avsluttet fullskjerm, og setter økten på pause.</p>
-            <p>En nettleser kan ikke hindre at fanen lukkes, og den kan ikke oppdage mobil, notater eller en annen skjerm. Instruksjonen sier det.</p>
+    const folder = storageFolder(settings.middle);
+    root.innerHTML = `<div class="setup">${shell('oppsett', 'MTS-lab · Eksperimentoppsett')}
+      <form class="cards" id="form">
+        <section class="card">
+          <h2><span class="num">1</span> Stimuli</h2>
+          <div class="fields">
+            <label class="field">Stimulussett
+              <select id="stimulusMode">
+                <option value="builtin" ${config.stimulusMode === 'builtin' ? 'selected' : ''}>Innebygd svart-hvitt</option>
+                <option value="upload" ${config.stimulusMode === 'upload' ? 'selected' : ''}>Opplastede bilder</option>
+              </select>
+            </label>
+            ${num('classes', 'Klasser (2–4)', config.classes, 2, 4)}
+            ${num('members', 'Medlemmer per klasse (3–8)', config.members, 3, 8)}
+            <label class="field">Bilder som ett medlemssett
+              <select id="pictureMember">${pictureOptions}</select>
+            </label>
           </div>
-        </aside>
-      </div>`;
+          <div class="stimuli" id="stimuli">${stimuli()}</div>
+          <p class="hint"><a href="#/symboler">Se gjennom symbolene</a> og utelat dem som ligner kjente tegn.</p>
+        </section>
+        <section class="card">
+          <h2><span class="num">2</span> Trening</h2>
+          <div class="fields">
+            <label class="field">Treningsstruktur
+              <select id="structure">
+                <option value="LS" ${config.structure === 'LS' ? 'selected' : ''}>Lineær serie (LS)</option>
+                <option value="OTM" ${config.structure === 'OTM' ? 'selected' : ''}>One-to-many (OTM)</option>
+                <option value="MTO" ${config.structure === 'MTO' ? 'selected' : ''}>Many-to-one (MTO)</option>
+              </select>
+            </label>
+            ${num('trialMultiplier', 'Trial-multiplikator', config.trialMultiplier, 1, 20)}
+            ${num('masteryNumerator', 'Mestringskriterium, teller', config.masteryNumerator, 1, 500)}
+            ${num('masteryDenominator', 'Mestringskriterium, nevner', config.masteryDenominator, 1, 500)}
+            ${field('thinning', 'Nedtrapping, prosent', config.thinning.join(', '))}
+            ${field('feedbackWordsNo', 'Ord ved riktig svar, trekkes tilfeldig', config.feedbackWordsNo.join(', '))}
+            ${num('feedbackDurationMs', 'Varighet, millisekunder', config.feedbackDurationMs, 0, 10000)}
+            <label class="field">Ved feil svar
+              <select id="wrongFeedback">
+                <option value="none" ${config.wrongFeedback === 'none' ? 'selected' : ''}>Ingenting</option>
+                <option value="feil" ${config.wrongFeedback === 'feil' ? 'selected' : ''}>«Feil»</option>
+                <option value="literature" ${config.wrongFeedback === 'literature' ? 'selected' : ''}>Litteraturstandard: «Feil» i 2 s</option>
+              </select>
+            </label>
+            <label class="check"><input id="correction" type="checkbox" ${config.correction ? 'checked' : ''}/> Korreksjonsprosedyre</label>
+            ${num('correctionMaxRepeats', 'Maks gjentakelser per feil', config.correctionMaxRepeats, 1, 30)}
+            <label class="check"><input id="serialIntroduction" type="checkbox" ${config.serialIntroduction ? 'checked' : ''}/> Gradvis innføring, én relasjon om gangen</label>
+          </div>
+          <p class="hint">Nedtrappingen gjelder tilbakemelding etter riktig svar. Tekst etter feil følger valget over.</p>
+        </section>
+        <section class="card">
+          <h2><span class="num">3</span> Presentasjon og test</h2>
+          <div class="fields">
+            <label class="field">MTS-type
+              <select id="mtsType">
+                <option value="simultaneous" ${config.mtsType === 'simultaneous' ? 'selected' : ''}>Simultan</option>
+                <option value="delayed" ${config.mtsType === 'delayed' ? 'selected' : ''}>Forsinket</option>
+              </select>
+            </label>
+            ${num('delaySeconds', 'Forsinkelse, sekunder', config.delaySeconds, 0, 60)}
+            ${num('itiSeconds', 'ITI, sekunder', config.itiSeconds, 0, 30, '0.1')}
+            ${num('sampleClicks', 'Klikk på utvalg (0 = vises samtidig)', config.sampleClicks, 0, 10)}
+            <label class="field">Posisjoner
+              <select id="positionBalance">
+                <option value="constrained" ${config.positionBalance === 'constrained' ? 'selected' : ''}>Begrenset, ett hjørne tomt</option>
+                <option value="free" ${config.positionBalance === 'free' ? 'selected' : ''}>Fri</option>
+              </select>
+            </label>
+            ${num('maxConsecutiveSPlus', 'Maks ganger S+ i samme hjørne på rad', config.maxConsecutiveSPlus, 1, 10)}
+            ${check('testSymmetry', 'Symmetri', config.testSymmetry)}
+            ${check('testTransitivity', 'Transitivitet', config.testTransitivity)}
+            ${check('testEquivalence', 'Ekvivalens', config.testEquivalence)}
+            ${check('testBaseline', 'Baseline i test', config.testBaseline)}
+            ${check('testReflexivity', 'Refleksivitet', config.testReflexivity)}
+            ${check('reflexivityAsPretest', 'Refleksivitet som forhåndstest', config.reflexivityAsPretest)}
+            ${num('testMultiplier', 'Test-multiplikator', config.testMultiplier, 1, 20)}
+          </div>
+          <div class="summary" id="summary">${summary()}</div>
+        </section>
+        <section class="card">
+          <h2><span class="num">4</span> Deltakerkoder</h2>
+          <p class="hint">Hver kode gjelder én deltaker, utløper etter 24 timer og knyttes til et tilfeldig nummer på fem sifre. Bare en hash sendes til Apps Script.</p>
+          <div class="actions">
+            <button type="button" class="solid" id="make-code">Generer deltakerkode</button>
+            <button type="button" class="ghost" id="start-here">Start økt på denne maskinen</button>
+          </div>
+          <p id="message">${escapeText(message)}</p>
+          <div id="codes">${codesTable()}</div>
+        </section>
+        <section class="card">
+          <h2><span class="num">5</span> Lagring og deltakerkontroll</h2>
+          <div class="folder-toggle" role="group" aria-label="Lagringsmappe">
+            <span class="folder-label">Lagringsmappe</span>
+            <button type="button" data-folder="Mennesker" aria-pressed="${folder === 'Mennesker'}">Mennesker</button>
+            <span class="pipe" aria-hidden="true">|</span>
+            <button type="button" data-folder="Boter-AI" aria-pressed="${folder === 'Boter-AI'}">Boter-AI</button>
+          </div>
+          <p class="hint" id="folder-path">Min disk / ${folder} / ${escapeText(config.studyId || 'mts')} / &lt;deltakernummer&gt; /</p>
+          <div class="fields">
+            ${field('studyId', 'Studie-ID / prosjektmappe', config.studyId)}
+            ${field('groupCode', 'Gruppekode (valgfri, ingen persondata)', config.groupCode)}
+            <label class="field">Språk for deltaker
+              <select id="language">
+                <option value="no" ${config.language === 'no' ? 'selected' : ''}>Norsk</option>
+                <option value="en" ${config.language === 'en' ? 'selected' : ''}>Engelsk</option>
+              </select>
+            </label>
+            ${field('scriptUrl', 'Apps Script-adresse', settings.scriptUrl)}
+            <label class="field">Hemmelighet (bare i denne nettleseren)
+              <input id="secret" type="password" value="${escapeAttr(settings.secret)}" autocomplete="off" />
+            </label>
+            <label class="field wide">Instruksjon, norsk
+              <textarea id="instructionNo">${escapeText(config.instructionNo)}</textarea>
+            </label>
+            <label class="field wide">Instruksjon, engelsk
+              <textarea id="instructionEn">${escapeText(config.instructionEn)}</textarea>
+            </label>
+          </div>
+          <div class="note">
+            <p>Forsøket går i fullskjerm. Nettleseren varsler ved lukking, men kan ikke hindre det. Programmet logger fanebytte, tapt fokus og avsluttet fullskjerm. Hjelpemidler utenfor maskinen kan ikke oppdages.</p>
+          </div>
+          <div class="actions">
+            <button type="button" class="solid" id="save-json">Lagre oppsett (JSON)</button>
+            <button type="button" class="ghost" id="load-json">Last oppsett</button>
+            <input id="json-file" type="file" accept="application/json,.json" hidden />
+            <button type="button" class="ghost" id="ping">Test tilkobling</button>
+            <button type="button" class="ghost" id="endpoint-file">Last ned lagring.json</button>
+          </div>
+        </section>
+      </form>
+    </div>`;
     bind();
   };
 
   const refreshBits = () => {
     const box = root.querySelector('#summary');
-    if (box) box.innerHTML = `<h2>Denne økten</h2>${summary()}`;
+    if (box) box.innerHTML = summary();
     const grid = root.querySelector('#stimuli');
     if (grid) grid.innerHTML = stimuli();
     bindUploads();
@@ -386,6 +382,17 @@ export function mountExperimenter(root: HTMLElement): () => void {
       message = 'Legg filen i public/ og bygg på nytt, slik at deltakere på andre maskiner finner Apps Script-adressen. Hemmeligheten ligger ikke i filen.';
       refreshBits();
     });
+    root.querySelectorAll<HTMLButtonElement>('[data-folder]').forEach((button) => {
+      button.addEventListener('click', () => {
+        settings.middle = storageFolder(button.dataset.folder);
+        persist();
+        root.querySelectorAll<HTMLButtonElement>('[data-folder]').forEach((item) => {
+          item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+        });
+        const path = root.querySelector('#folder-path');
+        if (path) path.textContent = `Min disk / ${settings.middle} / ${config.studyId || 'mts'} / <deltakernummer> /`;
+      });
+    });
     bindUploads();
   };
 
@@ -464,7 +471,6 @@ export function mountExperimenter(root: HTMLElement): () => void {
 
   void loadEndpointFile().then((file) => {
     if (!settings.scriptUrl && file.scriptUrl) settings.scriptUrl = file.scriptUrl;
-    if (settings.middle === 'Mennesker' && file.middle) settings.middle = file.middle;
     render();
   });
   render();

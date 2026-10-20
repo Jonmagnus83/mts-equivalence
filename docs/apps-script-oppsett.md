@@ -5,17 +5,17 @@ Dette oppsettet gjør at resultatene fra nettversjonen skrives til **din** Googl
 Mappene blir:
 
 ```text
-Min disk / Mennesker / <prosjekt> / <deltakernummer> / <deltakernummer>
-Min disk / Mennesker / <prosjekt> / <deltakernummer> / <deltakernummer>.csv
-Min disk / Mennesker / <prosjekt> / <deltakernummer> / <deltakernummer>.xlsx
-Min disk / Mennesker / <prosjekt> / <deltakernummer> / <deltakernummer>_hendelser.csv
+Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>
+Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>.csv
+Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>.xlsx
+Min disk / Mennesker eller Boter-AI / <prosjekt> / <deltakernummer> / <deltakernummer>_hendelser.csv
 ```
 
 `<deltakernummer>` uten etternavn er et Google-ark med fanene Data, Parametere og Hendelser. `.xlsx` er den samme filen som nettleseren lager. Prosjektmappen er studie-ID-en fra oppsettssiden.
 
-Standardmappen `Mennesker` kommer fra avklaringene 20.10.2026. Vil du bruke `Boter-AI` i stedet, sett skriptegenskapen `MIDDLE_FOLDER` til `Boter-AI`. Skal begge være lovlige, sett `ALLOWED_MIDDLE` til `Mennesker,Boter-AI`.
+På oppsettssiden, kort 5, velger du **Lagringsmappe**: `Mennesker` eller `Boter-AI`. Valget sendes med koden og med resultatfilene. Skriptet oppretter den mappen under Min disk. En skriptegenskap kan ikke overstyre valget.
 
-Kodearket ligger for seg selv i `Mennesker / _koder / MTS-koder`. Der står hashen, deltakernummeret, prosjektet og utløpstidspunktet. Selve koden står ikke der. Rader som er eldre enn 24 timer, slettes neste gang noen registrerer, løser inn eller sender inn data. Da slettes også oppsettsfilen som hørte til hashen.
+Kodearket ligger for seg selv i `MTS-koder`, uavhengig av hvilken resultatmappe du valgte. Der står hashen, deltakernummeret, prosjektet, mappen og utløpstidspunktet. Selve koden står ikke der. Rader som er eldre enn 24 timer, slettes neste gang noen registrerer, løser inn eller sender inn data. Da slettes også oppsettsfilen som hørte til hashen.
 
 En lokal kopi lastes alltid ned i nettleseren, også når opplastingen virker.
 
@@ -32,9 +32,8 @@ En lokal kopi lastes alltid ned i nettleseren, også når opplastingen virker.
 
 1. I prosjektinnstillingene, under **Skriptegenskaper**, velg **Legg til skriptegenskap**.
 2. Egenskap: `EXPERIMENTER_SECRET`. Verdi: et langt passord du finner på selv. Det brukes bare når du oppretter koder, ikke av deltakeren.
-3. Valgfritt: `MIDDLE_FOLDER` = `Mennesker` (eller `Boter-AI`).
-4. Valgfritt: `ROOT_FOLDER_ID` hvis filene skal ligge i en annen mappe enn roten av Min disk. Da er ID-en den lange koden i adresselinjen når mappen er åpen i Drive.
-5. Lagre.
+3. Valgfritt: `ROOT_FOLDER_ID` hvis filene skal ligge i en annen mappe enn roten av Min disk. Da er ID-en den lange koden i adresselinjen når mappen er åpen i Drive.
+4. Lagre.
 
 Skriv hemmeligheten ned et sted du har kontroll på. Den skal ikke legges i git, i `lagring.json` eller i en deltakerlenke.
 
@@ -54,9 +53,9 @@ Hver gang du endrer `Code.gs`, må du lage en **ny distribusjon** (eller rediger
 1. Åpne oppsettssiden.
 2. Lim nettadressen inn i feltet **Apps Script-adresse**.
 3. Lim hemmeligheten inn i feltet **Hemmelighet**. Den blir bare liggende i denne nettleserens lokale lager, ikke i oppsettsfilen.
-4. La **Mappe under Min disk** stå som `Mennesker`, med mindre du endret `MIDDLE_FOLDER`.
+4. Velg **Lagringsmappe**: Mennesker eller Boter-AI.
 5. Velg **Test tilkobling**. Siden skal svare at tilkoblingen virker, og at hemmeligheten er gjenkjent.
-6. Velg **Generer deltakerkode**. I Drive skal du nå se `Mennesker / _koder`.
+6. Velg **Generer deltakerkode**. I Drive skal du se `MTS-koder`, og etter en ferdig økt mappen du valgte.
 
 Deltakere som bruker en annen maskin, må nå den samme adressen. Den følger ikke med koden.
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import { expiryFrom, generateCode, generateParticipantNumber, hashCode, isExpired, normalizeCode } from '../src/codes';
+import { storageFolder } from '../src/folders';
 import { defaultConfig } from '../src/config';
 import { buildExport, EVENT_FIELDS, TRIAL_FIELDS, parameterColumns } from '../src/export';
 import { mulberry32 } from '../src/rng';
@@ -94,6 +95,15 @@ describe('export', () => {
     const eventSheet = XLSX.utils.sheet_to_json<Record<string, string | number>>(book.Sheets.Hendelser ?? {});
     for (const field of EVENT_FIELDS) expect(eventSheet[0]).toHaveProperty(field);
     expect(eventSheet[0]?.hendelse).toBe('hidden');
+  });
+});
+
+describe('storage folder', () => {
+  it('keeps the experimenter choice of Mennesker or Boter-AI', () => {
+    expect(storageFolder('Boter-AI')).toBe('Boter-AI');
+    expect(storageFolder('Mennesker')).toBe('Mennesker');
+    expect(storageFolder('noe-annet')).toBe('Mennesker');
+    expect(storageFolder(undefined)).toBe('Mennesker');
   });
 });
 
