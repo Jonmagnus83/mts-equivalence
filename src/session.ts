@@ -14,9 +14,28 @@ import type {
   ExperimentConfig,
   Phase,
   PlannedTrial,
+  RelationKind,
   SessionEventName,
   TrialRecord,
 } from './types';
+
+/** The programmed trial on screen. The agent adapter logs this; the agent does not receive it. */
+export interface ProgrammedView {
+  sample: string;
+  correct: string;
+  relation: string;
+  relationType: RelationKind;
+  phase: Phase;
+  placements: { stimulus: string; corner: Corner }[];
+  emptyCorner: Corner | null;
+  sPlusCorner: Corner;
+  isCorrection: boolean;
+  thinningPercent: number;
+  block: number;
+  attempt: number;
+  feedbackScheduled: boolean;
+  programmedIndex: number;
+}
 
 export type Screen =
   | { type: 'instruction' }
@@ -184,7 +203,57 @@ export class Session {
     if (this.screen.type !== 'choice' || this.finished) return;
     const trial = this.queue[this.cursor];
     if (!trial) return;
-    const correct = stimulus === trial.correct ? 1 : 0;
+    const correct: 0 | 1 = stimulus === trial.correct ? 1 : 0;
+    this.recordChoice(stimulus, corner, correct);
+  }
+
+  /** A trial with no usable agent answer. Counted as incorrect. Human sessions never call this. */
+  recordInvalidChoice(): void {
+    if (this.screen.type !== 'choice' || this.finished) return;
+    if (!this.queue[this.cursor]) return;
+    this.recordChoice('', '', 0);
+  }
+
+  /** Blocks started so far, including the one on screen. Human UI does not read this. */
+  startedBlocks(): number {
+    return this.blockNumber;
+  }
+
+  /** Stops the session. Used when an agent hits a safety limit. Human sessions never call this. */
+  halt(): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.pending = null;
+    this.nextAction = null;
+    this.screen = { type: 'done' };
+    this.onChange();
+  }
+
+  currentProgrammed(): ProgrammedView | null {
+    if (this.finished) return null;
+    const trial = this.queue[this.cursor];
+    if (!trial) return null;
+    return {
+      sample: trial.sample,
+      correct: trial.correct,
+      relation: trial.relation,
+      relationType: trial.relationType,
+      phase: trial.phase,
+      placements: trial.placements.map((item) => ({ ...item })),
+      emptyCorner: trial.emptyCorner,
+      sPlusCorner: trial.sPlusCorner,
+      isCorrection: trial.isCorrection,
+      thinningPercent: trial.thinningPercent,
+      block: this.currentBlock,
+      attempt: this.currentAttempt,
+      feedbackScheduled: trial.feedbackScheduled,
+      programmedIndex: trial.programmedIndex,
+    };
+  }
+
+  private recordChoice(stimulus: string, corner: string, correct: 0 | 1): void {
+    const trial = this.queue[this.cursor];
+    if (!trial) return;
     const rtChoice = Math.max(0, Math.round(this.now() - this.choiceOnset - this.pausedMs));
     const word = this.feedbackWord(correct === 1, trial);
     this.globalTrial += 1;

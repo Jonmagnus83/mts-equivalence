@@ -4,7 +4,7 @@ import { buildExport } from './export';
 import { cryptoSeed, mulberry32 } from './rng';
 import { Session } from './session';
 import type { Screen } from './session';
-import { stimulusSvg } from './symbols';
+import { stimulusMarkup } from './abstract-symbols';
 import {
   clearActiveSession,
   clearLocalRun,
@@ -208,7 +208,7 @@ export function mountParticipant(root: HTMLElement): () => void {
   const renderFigure = (stimulus: string) => {
     const config = configHolder.config;
     if (!config) return '';
-    return `<div class="figure">${stimulusSvg(stimulus, config.symbolAssignment, config.customStimuli)}</div>`;
+    return `<div class="figure">${stimulusMarkup(stimulus, config)}</div>`;
   };
 
   const renderScreen = (screen: Screen) => {

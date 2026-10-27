@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { agentParameterColumns, type AgentExportData } from './agents/meta';
 import type { EventRecord, ExperimentConfig, ParameterRow, TrialRecord } from './types';
 
 /** Column order for the Data sheet and the CSV copy. `par_` columns follow these. */
@@ -69,6 +70,7 @@ export function parameterColumns(config: ExperimentConfig): Record<string, strin
     par_test_multiplikator: config.testMultiplier,
     par_gradvis_innforing: config.serialIntroduction ? 1 : 0,
     par_stimulusmodus: config.stimulusMode,
+    par_stimulussett: config.stimulusSet,
     par_bildemedlem: config.pictureMember === null ? '' : config.pictureMember,
   };
 }
@@ -132,9 +134,16 @@ export function buildExport(
   config: ExperimentConfig,
   trials: TrialRecord[],
   events: EventRecord[],
+  agent: AgentExportData | null = null,
 ): ExportBundle {
-  const data = trials.map((trial) => trialRow(trial, config));
+  const data = trials.map((trial) => annotateAgent(trialRow(trial, config), trial, agent));
   const parameters = parameterSheet(config);
+  if (agent) {
+    for (const [parameter, verdi] of Object.entries(agentParameterColumns(agent))) {
+      parameters.push({ parameter, verdi: String(verdi) });
+    }
+    parameters.push({ parameter: 'par_agent_parametre', verdi: JSON.stringify(agent.parameters) });
+  }
   const eventRows = events.map((event) => {
     const row: Record<string, string | number> = {};
     for (const field of EVENT_FIELDS) row[field] = event[field];
@@ -149,7 +158,29 @@ export function buildExport(
     'Hendelser',
   );
   const summary = summaryRows(participantNumber, config, trials, events);
+  if (agent) {
+    summary.push({ maal: 'agenttype', verdi: agent.agentType });
+    summary.push({ maal: 'avslutning', verdi: agent.endReason });
+    summary.push({ maal: 'seed', verdi: agent.seed });
+    summary.push({ maal: 'mappe', verdi: agent.folder });
+  }
   XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(summary), 'Oppsummering');
+  if (agent) {
+    const agentRows = agent.traces.map((trace) => ({
+      forsøk_nr: trace.forsøk_nr,
+      agent_valg_posisjon: trace.position ?? '',
+      agent_latens_ms: trace.latencyMs,
+      agent_ugyldig: trace.invalid,
+      agent_forsok_nr: trace.attempts,
+      trial_request: JSON.stringify(trace.request),
+      trial_response: trace.response ? JSON.stringify(trace.response) : '',
+    }));
+    XLSX.utils.book_append_sheet(
+      book,
+      XLSX.utils.json_to_sheet(agentRows.length > 0 ? agentRows : [{ forsøk_nr: '' }]),
+      'Agent',
+    );
+  }
   const xlsx = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
   const rows = data.length > 0 ? data : [emptyDataRow(config)];
   return {
@@ -161,6 +192,25 @@ export function buildExport(
     rows,
   };
 }
+
+const AGENT_TRIAL_FIELDS = ['agent_valg_posisjon', 'agent_latens_ms', 'agent_ugyldig', 'agent_forsok_nr'] as const;
+
+function annotateAgent(
+  row: Record<string, string | number>,
+  trial: TrialRecord,
+  agent: AgentExportData | null,
+): Record<string, string | number> {
+  if (!agent) return row;
+  const trace = agent.traces.find((item) => item.forsøk_nr === trial.forsøk_nr);
+  row.agent_valg_posisjon = trace?.position ?? '';
+  row.agent_latens_ms = trace?.latencyMs ?? '';
+  row.agent_ugyldig = trace?.invalid ?? '';
+  row.agent_forsok_nr = trace?.attempts ?? '';
+  Object.assign(row, agentParameterColumns(agent));
+  return row;
+}
+
+export { AGENT_TRIAL_FIELDS };
 
 function emptyDataRow(config: ExperimentConfig): Record<string, string | number> {
   const row: Record<string, string | number> = {};

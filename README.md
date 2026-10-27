@@ -79,6 +79,19 @@ Arbeidsflyten slår på Pages selv (`actions/configure-pages` med `enablement: t
 
 Før den adressen deles med deltakere: legg Apps Script-adressen i `public/lagring.json` og bygg på nytt, hvis resultatene skal til Drive. Hemmeligheten skal ikke stå i den filen.
 
+## Agent i nettleseren
+
+Agentmodus er av til vanlig. Den vises bare når lagringsmappen er Boter-AI, og den endrer ikke menneskeøkten. Velg agent under Oppsett og trykk «Kjør agent i nettleseren». Økten går i samme `Session` som deltakeren, uten fullskjerm, fanevakt eller inaktivitetsvarsel. Tilfeldig agent, perfekt lærer og SEIAIA-PS følger med. Egne agenter og senere en lokal HTTP-agent er beskrevet i [docs/agentadapter.md](docs/agentadapter.md).
+
+Agentøkter bruker tegnene ◆ ▲ ● ■ ◢ ◤ △ ○ □. Det settet kan også velges for en menneskeøkt. Standard er fortsatt de innebygde figurene. Mastery er 17/18 i én blokk. Treffer økten `maxBlocks` eller `maxTrials` uten å mestre, avsluttes den med `ikke_mestret`.
+
+```bash
+npm test
+npx playwright test
+```
+
+Playwright-testen bruker Chrome som allerede er installert på maskinen.
+
 ## Analyse
 
 ```bash

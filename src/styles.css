@@ -345,6 +345,64 @@ button.ghost { background: #fff; color: #141414; }
 .corner.nv { bottom: 36px; left: 36px; }
 .corner.nh { bottom: 36px; right: 36px; }
 
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 64px;
+  line-height: 1;
+}
+
+.cell .glyph { font-size: 40px; }
+
+.agent-lab { max-width: 1100px; margin: 0 auto; padding: 0 20px 64px; }
+
+.agent-lab .top { max-width: none; }
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 16px;
+}
+
+.agent-board {
+  position: relative;
+  height: 280px;
+  background: #fff;
+  border-radius: 12px;
+}
+
+.agent-sample {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.agent-board .glyph { font-size: 48px; width: 64px; height: 64px; }
+
+.agent-board .corner {
+  width: 88px;
+  text-align: center;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.agent-board .corner.empty { color: var(--muted); border: 1px dashed var(--line); }
+.agent-board .corner.picked { outline: 2px solid #141414; }
+.agent-board .corner.hit { outline: 2px solid #1f7a3a; }
+.agent-board .corner.miss { outline: 2px solid #a32020; }
+
+.agent-lab .curve { width: 100%; height: auto; }
+
+.agent-lab h2 { font-size: 18px; margin: 0 0 8px; }
+
+@media (max-width: 800px) {
+  .agent-grid { grid-template-columns: 1fr; }
+}
+
 .feedback-word {
   margin: 0;
   font-size: min(8vw, 64px);
