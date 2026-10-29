@@ -3,25 +3,70 @@
  * Run: node scripts/generate-squiggles.mjs
  * Check the checked-in files: node scripts/generate-squiggles.mjs --check
  *
- * Each stimulus is one open cubic Bézier (6 anchors, 5 segments), black stroke
+ * Each stimulus is one open cubic Bézier (7 anchors), black stroke
  * on white, same stroke width. Candidates that are closed, nearly symmetric,
  * self-crossing, or too close to an accepted curve under rotation, reflection
- * or reversal are discarded. The output is deterministic for SQUIGGLE_SEED.
+ * or reversal are discarded. A candidate is also discarded when, in any of four
+ * quarter-turns, its stroke lies close to a rendered DejaVu Sans glyph
+ * A–Z, a–z or 0–9 (scripts/glyph-templates.json). The output is deterministic
+ * for SQUIGGLE_SEED.
  */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const SEED = 20261029;
+const SEED = 20261030;
 const COUNT = 12;
-const MIN_DISTANCE = 0.5;
+const MIN_DISTANCE = 0.46;
 const ANCHORS = 7;
 const STROKE = 5.5;
 const LETTERS = 'ABCDEFGH';
 const CLASSES = 4;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const glyphPath = join(dirname(fileURLToPath(import.meta.url)), 'glyph-templates.json');
+const glyphFile = JSON.parse(readFileSync(glyphPath, 'utf8'));
+const GLYPH_SIZE = glyphFile.size;
+function distanceGrid(mask) {
+  const n = GLYPH_SIZE * GLYPH_SIZE;
+  const dist = new Uint16Array(n);
+  dist.fill(999);
+  const queue = [];
+  for (let i = 0; i < n; i++) {
+    if (!mask[i]) continue;
+    dist[i] = 0;
+    queue.push(i);
+  }
+  let head = 0;
+  while (head < queue.length) {
+    const index = queue[head++];
+    const next = dist[index] + 1;
+    const x = index % GLYPH_SIZE;
+    const y = (index / GLYPH_SIZE) | 0;
+    const visit = (nx, ny) => {
+      if (nx < 0 || ny < 0 || nx >= GLYPH_SIZE || ny >= GLYPH_SIZE) return;
+      const neighbor = ny * GLYPH_SIZE + nx;
+      if (dist[neighbor] <= next) return;
+      dist[neighbor] = next;
+      queue.push(neighbor);
+    };
+    visit(x + 1, y);
+    visit(x - 1, y);
+    visit(x, y + 1);
+    visit(x, y - 1);
+  }
+  return dist;
+}
+
+const GLYPHS = glyphFile.glyphs.map((glyph) => {
+  const mask = new Uint8Array(GLYPH_SIZE * GLYPH_SIZE);
+  for (const index of glyph.ink) mask[index] = 1;
+  return { char: glyph.char, mask, count: glyph.ink.length, dist: distanceGrid(mask) };
+});
+/** Mean distance, in grid pixels, from the stroke to a glyph skeleton. Lower is closer. */
+const GLYPH_MEAN = 2.85;
+const GLYPH_RECALL = 0.4;
 const tsPath = join(root, 'src/stimuli/squiggles.ts');
 const dirPath = join(root, 'src/stimuli/squiggles');
 const sheetPath = join(root, 'docs/krusseduller-kontaktark.svg');
@@ -238,6 +283,68 @@ function shapeDistance(a, b) {
   );
 }
 
+function rotatePlaced(points, k) {
+  if (k === 0) return points;
+  const ang = (k * Math.PI) / 2;
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  return points.map((p) => [50 + c * (p[0] - 50) - s * (p[1] - 50), 50 + s * (p[0] - 50) + c * (p[1] - 50)]);
+}
+
+function centerline(points) {
+  const seen = new Uint8Array(GLYPH_SIZE * GLYPH_SIZE);
+  const ink = [];
+  const plot = (x, y) => {
+    const px = Math.round((x / 100) * (GLYPH_SIZE - 1));
+    const py = Math.round((y / 100) * (GLYPH_SIZE - 1));
+    if (px < 0 || py < 0 || px >= GLYPH_SIZE || py >= GLYPH_SIZE) return;
+    const index = py * GLYPH_SIZE + px;
+    if (seen[index]) return;
+    seen[index] = 1;
+    ink.push(index);
+  };
+  for (let i = 1; i < points.length; i++) {
+    const steps = Math.max(1, Math.ceil(Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      plot(
+        points[i - 1][0] + (points[i][0] - points[i - 1][0]) * t,
+        points[i - 1][1] + (points[i][1] - points[i - 1][1]) * t,
+      );
+    }
+  }
+  return ink;
+}
+
+function glyphMatch(placedPoints) {
+  let bestMean = Infinity;
+  let bestChar = '';
+  let bestRecall = 0;
+  for (let k = 0; k < 4; k++) {
+    const line = centerline(rotatePlaced(placedPoints, k));
+    if (line.length === 0) continue;
+    const lineMask = new Uint8Array(GLYPH_SIZE * GLYPH_SIZE);
+    for (const index of line) lineMask[index] = 1;
+    const lineDist = distanceGrid(lineMask);
+    for (const glyph of GLYPHS) {
+      let sum = 0;
+      for (const index of line) sum += glyph.dist[index];
+      const mean = sum / line.length;
+      let covered = 0;
+      for (let index = 0; index < glyph.mask.length; index++) {
+        if (glyph.mask[index] && lineDist[index] <= 2) covered += 1;
+      }
+      const recall = covered / glyph.count;
+      if (mean < bestMean) {
+        bestMean = mean;
+        bestChar = glyph.char;
+        bestRecall = recall;
+      }
+    }
+  }
+  return { mean: bestMean, char: bestChar, recall: bestRecall };
+}
+
 function symmetryScore(samples) {
   samples = coarse(samples);
   const mirrors = [
@@ -301,6 +408,8 @@ function accept(segments, accepted) {
   if (move.changes < 2 || move.dominance > 0.55 || move.shaft > 0.4) return null;
   const samples = unitSamples(placedPts.points);
   if (symmetryScore(samples) < 0.45) return null;
+  const glyph = glyphMatch(densePoints(placed, 8));
+  if (glyph.mean <= GLYPH_MEAN && glyph.recall >= GLYPH_RECALL) return null;
   for (const other of accepted) {
     if (shapeDistance(samples, other.samples) < MIN_DISTANCE) return null;
   }
@@ -331,12 +440,14 @@ function stimulusIdFor(index) {
 export function generateSquiggles(seed = SEED) {
   const rng = mulberry32(seed);
   const accepted = [];
-  const limit = 120000;
+  const limit = 400000;
   for (let attempt = 0; attempt < limit && accepted.length < COUNT; attempt++) {
     const raw = catmull(propose(rng));
     const hit = accept(raw, accepted);
     if (hit) accepted.push(hit);
-    if (attempt > 0 && attempt % 20000 === 0) console.log(`${accepted.length} godtatt etter ${attempt} forsøk`);
+    if (!process.argv.includes('--check') && attempt > 0 && attempt % 20000 === 0) {
+      console.log(`${accepted.length} godtatt etter ${attempt} forsøk`);
+    }
   }
   if (accepted.length < COUNT) {
     throw new Error(`Fant bare ${accepted.length} av ${COUNT} krusseduller.`);
@@ -428,6 +539,26 @@ function checkedPaths() {
   return found.map((match) => ({ id: match[1], stimulusId: match[2], d: match[3] }));
 }
 
+function segmentsFromD(d) {
+  const nums = d.match(/-?\d+(?:\.\d+)?/g).map(Number);
+  const segments = [];
+  let p0 = [nums[0], nums[1]];
+  for (let i = 2; i + 5 < nums.length; i += 6) {
+    const p3 = [nums[i + 4], nums[i + 5]];
+    segments.push({ p0, c1: [nums[i], nums[i + 1]], c2: [nums[i + 2], nums[i + 3]], p3 });
+    p0 = p3;
+  }
+  return segments;
+}
+
+function auditStored() {
+  const stored = checkedPaths();
+  for (const item of stored) {
+    const score = glyphMatch(densePoints(segmentsFromD(item.d), 8));
+    console.log(`${item.id} ${item.stimulusId}  middel ${score.mean.toFixed(2)}  dekning ${score.recall.toFixed(2)}  «${score.char}»`);
+  }
+}
+
 function check() {
   const fresh = generateSquiggles(SEED);
   const stored = checkedPaths();
@@ -446,7 +577,9 @@ function check() {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
-  if (process.argv.includes('--check')) {
+  if (process.argv.includes('--audit')) {
+    auditStored();
+  } else if (process.argv.includes('--check')) {
     check();
     console.log(`Krussedullene stemmer med seed ${SEED}.`);
   } else {

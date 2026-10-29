@@ -15,7 +15,7 @@ Jon (27.10.2026, endret 29.10): testforsøk teller i agentens minnehistorikk, ma
 
 Tempo `rask` kaller `completeWait()` uten ventetid (`par_klokke` = virtuell). `sanntid` venter ITI og tilbakemelding. Standard er rask.
 
-Symbolsettet `abstrakte` er valgbart på oppsettet og er standard bare i agentøkter. Menneskeøkter starter fortsatt på de innebygde figurene. Settet er tolv faste SVG-kurver, generert med seed `20261029` (`npm run stimuli:squiggles`) og sjekket inn. Det dekker A–C og klasse 1–4. SEIAIA-PS krever 3×3. `glyph` i protokollen er tom for dette settet, så agenten ikke får et tegnnavn. `symbol_id` er `k01`–`k12`.
+Symbolsettet `abstrakte` er valgbart på oppsettet og er standard bare i agentøkter. Menneskeøkter starter fortsatt på de innebygde figurene. Settet er tolv faste SVG-kurver, generert med seed `20261030` (`npm run stimuli:squiggles`) og sjekket inn. Generatoren forkaster kurver som i en av fire rotasjoner ligger nær en gjengitt glyf A–Z, a–z eller 0–9. Det dekker A–C og klasse 1–4. SEIAIA-PS krever 3×3. `glyph` i protokollen er tom for dette settet, så agenten ikke får et tegnnavn. `symbol_id` er `k01`–`k12`.
 
 ## Protokoll `mts-agent/1`
 
