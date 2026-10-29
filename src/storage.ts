@@ -1,3 +1,4 @@
+import type { AgentExportData } from './agents/meta';
 import { buildExport } from './export';
 import { storageFolder } from './folders';
 import { CODE_TTL_MS } from './codes';
@@ -300,8 +301,9 @@ export async function uploadResults(args: {
   trials: TrialRecord[];
   events: EventRecord[];
   final: boolean;
+  agent?: AgentExportData | null;
 }): Promise<{ ok: boolean; detail: string }> {
-  const bundle = buildExport(args.participantNumber, args.config, args.trials, args.events);
+  const bundle = buildExport(args.participantNumber, args.config, args.trials, args.events, args.agent ?? null);
   const xlsxBase64 = bytesToBase64(bundle.xlsx);
   const payload: Record<string, unknown> = {
     action: 'submit',

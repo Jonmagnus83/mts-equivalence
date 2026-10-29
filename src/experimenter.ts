@@ -1,10 +1,11 @@
+import { designFitsAbstractSet, stimulusMarkup } from './abstract-symbols';
+import { agentChoices, agentModeAllowed, loadAgentSettings, normalizeSettings, saveAgentLaunch, saveAgentSettings, type AgentSettings } from './agents/launch';
 import { formatCode, generateParticipantNumber, hashCode, participantLink } from './codes';
 import { storageFolder } from './folders';
 import { assignSymbols, parseConfig } from './config';
 import { formatRatio, jonTestRequired, literatureRequired, requiredCorrect } from './criteria';
 import { cryptoSeed, mulberry32 } from './rng';
 import { shell } from './shell';
-import { stimulusSvg } from './symbols';
 import { planSizes } from './trials';
 import {
   clearSessionToken,
@@ -33,6 +34,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
   let readyLink = '';
   let loginError = '';
   let offlineUnlocked = location.protocol === 'file:';
+  let agentSettings: AgentSettings = loadAgentSettings();
 
   const persist = () => {
     saveConfig(config);
@@ -55,6 +57,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       instructionNo: value('instructionNo'),
       instructionEn: value('instructionEn'),
       stimulusMode: value('stimulusMode') === 'upload' ? 'upload' : 'builtin',
+      stimulusSet: value('stimulusSet') === 'abstrakte' ? 'abstrakte' : 'innebygd',
       classes: Number(value('classes')),
       members: Number(value('members')),
       pictureMember: picture === '' ? null : Number(picture),
@@ -87,6 +90,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       symbolAssignment: config.symbolAssignment,
     });
     config.symbolAssignment = assignSymbols(config);
+    if (root.querySelector('#agent-type')) agentSettings = readAgentSettings();
     const pressed = root.querySelector<HTMLButtonElement>('.folder-toggle [aria-pressed="true"]');
     settings = {
       scriptUrl: value('scriptUrl').trim(),
@@ -94,6 +98,25 @@ export function mountExperimenter(root: HTMLElement): () => void {
       middle: storageFolder(pressed?.dataset.folder ?? settings.middle),
     };
     persist();
+    saveAgentSettings(agentSettings);
+  };
+
+  const readAgentSettings = (): AgentSettings => {
+    const value = (id: string) => (root.querySelector(`#${id}`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
+    const checked = (id: string) => (root.querySelector(`#${id}`) as HTMLInputElement | null)?.checked ?? false;
+    return normalizeSettings({
+      agentType: value('agent-type'),
+      seed: Number(value('agent-seed')),
+      pace: value('agent-pace') === 'sanntid' ? 'sanntid' : 'rask',
+      maxBlocks: Number(value('max-blocks')),
+      maxTrials: Number(value('max-trials')),
+      revealCorrection: checked('reveal-correction'),
+      memoryMode: value('memory-mode') === 'last_n' ? 'last_n' : value('memory-mode') === 'none' ? 'none' : 'full',
+      memoryN: Number(value('memory-n')),
+      gamma: Number(value('agent-gamma')),
+      derivedMode: value('derived-mode') === 'ne' ? 'ne' : 'path',
+      neVariant: value('ne-variant') === 'dne' ? 'dne' : 'sne',
+    });
   };
 
   const summary = () => {
@@ -135,7 +158,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
         const picture = config.pictureMember === member;
         cells.push(`<div class="cell">
           <strong>${id}${picture ? ' · bilde' : ''}</strong>
-          <div class="figure">${stimulusSvg(id, config.symbolAssignment, config.customStimuli)}</div>
+          <div class="figure">${stimulusMarkup(id, config)}</div>
           <input type="file" accept="image/*" data-upload="${id}" />
         </div>`);
       }
@@ -223,6 +246,12 @@ export function mountExperimenter(root: HTMLElement): () => void {
         <section class="card">
           <h2><span class="num">1</span> Stimuli</h2>
           <div class="fields">
+            <label class="field">Symbolsett
+              <select id="stimulusSet">
+                <option value="innebygd" ${config.stimulusSet !== 'abstrakte' ? 'selected' : ''}>Innebygde figurer (standard)</option>
+                <option value="abstrakte" ${config.stimulusSet === 'abstrakte' ? 'selected' : ''}>Krusseduller</option>
+              </select>
+            </label>
             <label class="field">Stimulussett
               <select id="stimulusMode">
                 <option value="builtin" ${config.stimulusMode === 'builtin' ? 'selected' : ''}>Innebygd svart-hvitt</option>
@@ -236,7 +265,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             </label>
           </div>
           <div class="stimuli" id="stimuli">${stimuli()}</div>
-          <p class="hint"><a href="#/symboler">Se gjennom symbolene</a> og utelat dem som ligner kjente tegn.</p>
+          <p class="hint"><a href="#/symboler">Se gjennom symbolene</a> og utelat dem som ligner kjente tegn. Krussedullene er et fast sett åpne streker (A–C, klasse 1–4). De endrer ikke de innebygde figurene. Standard for menneskeøkter er fortsatt de innebygde figurene.</p>
         </section>
         <section class="card">
           <h2><span class="num">2</span> Trening</h2>
@@ -350,6 +379,53 @@ export function mountExperimenter(root: HTMLElement): () => void {
             <button type="button" class="ghost" id="logout">Logg ut</button>
           </div>
         </section>
+        <section class="card">
+          <h2><span class="num">6</span> Agent i nettleseren</h2>
+          <p class="hint">${agentModeAllowed(folder)
+            ? 'Agentmodus er på fordi lagringsmappen er Boter-AI. Menneskevakter er av bare i agentøkten. Økten bruker krussedullene, mastery 17/18 i én blokk, og testforsøk teller i SEIAIA-PS sin historikk.'
+            : 'Agentmodus er av. Den kan bare brukes når lagringsmappen er Boter-AI, så agentdata ikke havner i Mennesker.'}</p>
+          <div class="fields">
+            <label class="field">Agent
+              <select id="agent-type" ${agentModeAllowed(folder) ? '' : 'disabled'}>
+                ${agentChoices().map((choice) => `<option value="${choice.id}" ${agentSettings.agentType === choice.id ? 'selected' : ''}>${choice.label}</option>`).join('')}
+              </select>
+            </label>
+            ${num('agent-seed', 'Seed', agentSettings.seed, 0, 2147483647)}
+            <label class="field">Tempo
+              <select id="agent-pace" ${agentModeAllowed(folder) ? '' : 'disabled'}>
+                <option value="rask" ${agentSettings.pace === 'rask' ? 'selected' : ''}>Rask (ingen ventetid)</option>
+                <option value="sanntid" ${agentSettings.pace === 'sanntid' ? 'selected' : ''}>Sanntid</option>
+              </select>
+            </label>
+            ${num('max-blocks', 'Maks blokker', agentSettings.maxBlocks, 1, 500)}
+            ${num('max-trials', 'Maks forsøk', agentSettings.maxTrials, 1, 20000)}
+            <label class="field">Minnemodus (SEIAIA-PS)
+              <select id="memory-mode" ${agentModeAllowed(folder) ? '' : 'disabled'}>
+                <option value="full" ${agentSettings.memoryMode === 'full' ? 'selected' : ''}>Full historikk</option>
+                <option value="last_n" ${agentSettings.memoryMode === 'last_n' ? 'selected' : ''}>Siste N</option>
+                <option value="none" ${agentSettings.memoryMode === 'none' ? 'selected' : ''}>Ingen</option>
+              </select>
+            </label>
+            ${num('memory-n', 'N ved siste N', agentSettings.memoryN, 1, 5000)}
+            ${num('agent-gamma', 'γ (SEIAIA-PS)', agentSettings.gamma, 0, 0.999, '0.0001')}
+            <label class="field">Avledede relasjoner
+              <select id="derived-mode" ${agentModeAllowed(folder) ? '' : 'disabled'}>
+                <option value="path" ${agentSettings.derivedMode === 'path' ? 'selected' : ''}>Maks-produkt-sti</option>
+                <option value="ne" ${agentSettings.derivedMode === 'ne' ? 'selected' : ''}>Network Enhancement</option>
+              </select>
+            </label>
+            <label class="field">NE-variant
+              <select id="ne-variant" ${agentModeAllowed(folder) ? '' : 'disabled'}>
+                <option value="sne" ${agentSettings.neVariant === 'sne' ? 'selected' : ''}>SNE</option>
+                <option value="dne" ${agentSettings.neVariant === 'dne' ? 'selected' : ''}>DNE</option>
+              </select>
+            </label>
+            ${check('reveal-correction', 'Fortell agenten at forsøket er en korreksjon', agentSettings.revealCorrection)}
+          </div>
+          <div class="actions">
+            <button type="button" class="solid" id="run-agent" ${agentModeAllowed(folder) ? '' : 'disabled'}>Kjør agent i nettleseren</button>
+          </div>
+        </section>
       </form>
     </div>`;
     bind();
@@ -438,6 +514,35 @@ export function mountExperimenter(root: HTMLElement): () => void {
       saveLocalRun({ config, participantNumber });
       location.hash = '#/deltaker/lokal';
     });
+    root.querySelector('#run-agent')?.addEventListener('click', () => {
+      read();
+      if (!agentModeAllowed(settings.middle)) {
+        message = 'Agentmodus kan bare brukes når lagringsmappen er Boter-AI.';
+        refreshBits();
+        return;
+      }
+      const launchConfig = parseConfig({ ...config, stimulusSet: 'abstrakte' });
+      if (!designFitsAbstractSet(launchConfig.classes, launchConfig.members)) {
+        message = 'Krussedullene dekker 3 medlemmer og 2–4 klasser (A–C). Juster oppsettet, eller bruk de innebygde figurene for større oppsett.';
+        refreshBits();
+        return;
+      }
+      const choice = agentChoices().find((item) => item.id === agentSettings.agentType);
+      if (choice?.needsThree && (launchConfig.classes !== 3 || launchConfig.members !== 3)) {
+        message = 'SEIAIA-PS krever 3 klasser og 3 medlemmer.';
+        refreshBits();
+        return;
+      }
+      const used = new Set(loadCodes().map((item) => item.participantNumber));
+      const participantNumber = generateParticipantNumber(mulberry32(cryptoSeed()), used);
+      saveAgentLaunch({
+        ...agentSettings,
+        config: launchConfig,
+        participantNumber,
+        folder: 'Boter-AI',
+      });
+      location.hash = '#/agent';
+    });
     root.querySelector('#ping')?.addEventListener('click', () => {
       read();
       void ping();
@@ -454,13 +559,11 @@ export function mountExperimenter(root: HTMLElement): () => void {
     });
     root.querySelectorAll<HTMLButtonElement>('[data-folder]').forEach((button) => {
       button.addEventListener('click', () => {
-        settings.middle = storageFolder(button.dataset.folder);
-        persist();
         root.querySelectorAll<HTMLButtonElement>('[data-folder]').forEach((item) => {
           item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
         });
-        const path = root.querySelector('#folder-path');
-        if (path) path.textContent = `Min disk / ${settings.middle} / ${config.studyId || 'mts'} / <deltakernummer> /`;
+        read();
+        render();
       });
     });
     bindUploads();

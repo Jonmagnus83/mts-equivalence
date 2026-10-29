@@ -1,5 +1,5 @@
 import { allStimulusIds } from './relations';
-import type { ExperimentConfig, Language, StimulusMode, TrainingStructure, WrongFeedback } from './types';
+import type { ExperimentConfig, Language, StimulusMode, StimulusSet, TrainingStructure, WrongFeedback } from './types';
 import { SYMBOLS } from './symbols';
 
 export const DEFAULT_INSTRUCTION_NO = `Du skal gjøre en oppgave på denne skjermen.
@@ -59,6 +59,7 @@ export function defaultConfig(): ExperimentConfig {
     testMultiplier: 3,
     serialIntroduction: false,
     stimulusMode: 'builtin',
+    stimulusSet: 'innebygd',
     pictureMember: null,
     symbolAssignment: {},
     customStimuli: {},
@@ -110,6 +111,7 @@ export function parseConfig(raw: unknown): ExperimentConfig {
     : base.wrongFeedback;
   const language: Language = input.language === 'en' ? 'en' : 'no';
   const stimulusMode: StimulusMode = input.stimulusMode === 'upload' ? 'upload' : 'builtin';
+  const stimulusSet: StimulusSet = input.stimulusSet === 'abstrakte' ? 'abstrakte' : 'innebygd';
   const thinning = Array.isArray(input.thinning)
     ? input.thinning.map((n) => clampInt(n, 0, 100, 0)).filter((_, i, arr) => arr.length > 0)
     : base.thinning;
@@ -149,6 +151,7 @@ export function parseConfig(raw: unknown): ExperimentConfig {
     testMultiplier: clampInt(input.testMultiplier, 1, 20, base.testMultiplier),
     serialIntroduction: asBool(input.serialIntroduction, base.serialIntroduction),
     stimulusMode,
+    stimulusSet,
     pictureMember:
       input.pictureMember === null || input.pictureMember === undefined
         ? null

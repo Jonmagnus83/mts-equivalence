@@ -1,3 +1,4 @@
+import { mountAgent } from './agent-page';
 import { mountExperimenter } from './experimenter';
 import { mountParticipant } from './participant';
 import { mountSymbols } from './symbols-page';
@@ -15,6 +16,7 @@ function route(): void {
     cleanup = mountParticipant(root as HTMLElement);
   }
   else if (hash.startsWith('#/symboler')) cleanup = mountSymbols(root as HTMLElement);
+  else if (hash.startsWith('#/agent')) cleanup = mountAgent(root as HTMLElement);
   else cleanup = mountExperimenter(root as HTMLElement);
 }
 

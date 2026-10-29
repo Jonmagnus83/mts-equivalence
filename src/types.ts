@@ -13,6 +13,8 @@ export type Phase = 'forhåndstest' | 'trening' | 'test';
 export type PositionMode = 'constrained' | 'free';
 export type Language = 'no' | 'en';
 export type StimulusMode = 'builtin' | 'upload';
+/** `innebygd` is the human default. `abstrakte` is the checked-in squiggle set. */
+export type StimulusSet = 'innebygd' | 'abstrakte';
 
 /** Four screen corners. øv/øh = upper left/right, nv/nh = lower left/right. */
 export const CORNERS = ['øv', 'øh', 'nv', 'nh'] as const;
@@ -59,6 +61,8 @@ export interface ExperimentConfig {
   testMultiplier: number;
   serialIntroduction: boolean;
   stimulusMode: StimulusMode;
+  /** Which pictures the participant sees. Default `innebygd` leaves the SVG set unchanged. */
+  stimulusSet: StimulusSet;
   /** Member index (0 = A) that uses uploaded pictures. Null = no picture node. */
   pictureMember: number | null;
   /** Builtin symbol id per stimulus id (A1, B2, …). */
