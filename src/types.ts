@@ -13,7 +13,7 @@ export type Phase = 'forhåndstest' | 'trening' | 'test';
 export type PositionMode = 'constrained' | 'free';
 export type Language = 'no' | 'en';
 export type StimulusMode = 'builtin' | 'upload';
-/** `innebygd` is the human default. `abstrakte` is the nine text glyphs. */
+/** `innebygd` is the human default. `abstrakte` is the checked-in squiggle set. */
 export type StimulusSet = 'innebygd' | 'abstrakte';
 
 /** Four screen corners. øv/øh = upper left/right, nv/nh = lower left/right. */

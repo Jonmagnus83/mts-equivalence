@@ -1,4 +1,4 @@
-import { ABSTRACT_GLYPH_LIST, designFitsAbstractSet, stimulusMarkup } from './abstract-symbols';
+import { designFitsAbstractSet, stimulusMarkup } from './abstract-symbols';
 import { agentChoices, agentModeAllowed, loadAgentSettings, normalizeSettings, saveAgentLaunch, saveAgentSettings, type AgentSettings } from './agents/launch';
 import { formatCode, generateParticipantNumber, hashCode, participantLink } from './codes';
 import { storageFolder } from './folders';
@@ -249,7 +249,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             <label class="field">Symbolsett
               <select id="stimulusSet">
                 <option value="innebygd" ${config.stimulusSet !== 'abstrakte' ? 'selected' : ''}>Innebygde figurer (standard)</option>
-                <option value="abstrakte" ${config.stimulusSet === 'abstrakte' ? 'selected' : ''}>Abstrakte tegn (${ABSTRACT_GLYPH_LIST})</option>
+                <option value="abstrakte" ${config.stimulusSet === 'abstrakte' ? 'selected' : ''}>Krusseduller</option>
               </select>
             </label>
             <label class="field">Stimulussett
@@ -265,7 +265,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
             </label>
           </div>
           <div class="stimuli" id="stimuli">${stimuli()}</div>
-          <p class="hint"><a href="#/symboler">Se gjennom symbolene</a> og utelat dem som ligner kjente tegn. Abstrakte tegn er et eget sett (A1–C3) og endrer ikke de innebygde figurene. Standard er fortsatt de innebygde figurene.</p>
+          <p class="hint"><a href="#/symboler">Se gjennom symbolene</a> og utelat dem som ligner kjente tegn. Krussedullene er et fast sett åpne streker (A–C, klasse 1–4). De endrer ikke de innebygde figurene. Standard for menneskeøkter er fortsatt de innebygde figurene.</p>
         </section>
         <section class="card">
           <h2><span class="num">2</span> Trening</h2>
@@ -382,7 +382,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
         <section class="card">
           <h2><span class="num">6</span> Agent i nettleseren</h2>
           <p class="hint">${agentModeAllowed(folder)
-            ? 'Agentmodus er på fordi lagringsmappen er Boter-AI. Menneskevakter er av bare i agentøkten. Økten bruker tegnene ◆ ▲ ● ■ ◢ ◤ △ ○ □, mastery 17/18 i én blokk, og testforsøk teller i SEIAIA-PS sin historikk.'
+            ? 'Agentmodus er på fordi lagringsmappen er Boter-AI. Menneskevakter er av bare i agentøkten. Økten bruker krussedullene, mastery 17/18 i én blokk, og testforsøk teller i SEIAIA-PS sin historikk.'
             : 'Agentmodus er av. Den kan bare brukes når lagringsmappen er Boter-AI, så agentdata ikke havner i Mennesker.'}</p>
           <div class="fields">
             <label class="field">Agent
@@ -523,7 +523,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       }
       const launchConfig = parseConfig({ ...config, stimulusSet: 'abstrakte' });
       if (!designFitsAbstractSet(launchConfig.classes, launchConfig.members)) {
-        message = 'Agentøkter bruker bare tegnene ◆ ▲ ● ■ ◢ ◤ △ ○ □. Det settet dekker 3 medlemmer og 2 eller 3 klasser (A1–C3).';
+        message = 'Krussedullene dekker 3 medlemmer og 2–4 klasser (A–C). Juster oppsettet, eller bruk de innebygde figurene for større oppsett.';
         refreshBits();
         return;
       }

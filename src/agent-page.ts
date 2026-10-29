@@ -1,3 +1,4 @@
+import { stimulusMarkup } from './abstract-symbols';
 import './agents/custom';
 import { hashCode } from './codes';
 import { parseConfig } from './config';
@@ -214,12 +215,12 @@ function nowHtml(view: ObserverSnapshot): string {
     const slot = current.slots.find((item) => item.corner === corner);
     if (!slot) return `<div class="corner ${cornerClass(corner)} empty"><span>tomt</span></div>`;
     const mark = slot.chosen ? (current.correct === true ? 'hit' : current.correct === false ? 'miss' : 'picked') : '';
-    return `<div class="corner ${cornerClass(corner)} ${mark}"><span class="glyph">${esc(slot.glyph)}</span><small>${slot.position} ${esc(slot.id)}</small></div>`;
+    return `<div class="corner ${cornerClass(corner)} ${mark}">${figure(slot.id)}<small>${slot.position}</small></div>`;
   }).join('');
   const feedback = current.feedbackGiven ? esc(current.feedbackWord) : 'ingen tilbakemelding';
   return `<h2>Nå-trial</h2>
     <div class="agent-board">
-      <div class="agent-sample"><span class="glyph">${esc(current.sampleGlyph)}</span><small>${esc(current.sampleId)}</small></div>
+      <div class="agent-sample">${figure(current.sampleId)}</div>
       ${corners}
     </div>
     <p>${esc(current.relation)} · ${esc(current.phase)} · blokk ${current.block} · ${current.thinning} % · ${esc(current.relationType)}${current.correction ? ' · korreksjon' : ''}</p>
@@ -327,6 +328,10 @@ async function publish(
   } catch (error) {
     if (note) note.textContent = error instanceof Error ? error.message : 'Nedlastet. Opplasting feilet.';
   }
+}
+
+function figure(id: string): string {
+  return stimulusMarkup(id, { stimulusSet: 'abstrakte', symbolAssignment: {}, customStimuli: {} });
 }
 
 function cornerClass(corner: string): string {

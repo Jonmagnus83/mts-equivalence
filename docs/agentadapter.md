@@ -2,7 +2,7 @@
 
 Agenten kjører i nettleseren, i samme `Session` som en deltaker (`src/session.ts`). `AgentDriver` (`src/agents/driver.ts`) klikker utvalg, sender `trial_request` og legger svaret inn med `clickComparison`. Menneskeøkten er uendret: agentmodus er av til den velges, og bare når lagringsmappen er Boter-AI.
 
-Jon (27.10.2026): testforsøk teller i agentens minnehistorikk, mastery er 17/18 i én blokk, stimuli i agentøkter er de abstrakte tegnene, og agenten skal kjøre uten installasjon. MTS-lab er ikke koblet til noe undervisningsverktøy.
+Jon (27.10.2026, endret 29.10): testforsøk teller i agentens minnehistorikk, mastery er 17/18 i én blokk, stimuli i agentøkter er faste krusseduller (ikke navngitte tegn), og agenten skal kjøre uten installasjon. MTS-lab er ikke koblet til noe undervisningsverktøy.
 
 ## Hva som følger med
 
@@ -15,7 +15,7 @@ Jon (27.10.2026): testforsøk teller i agentens minnehistorikk, mastery er 17/18
 
 Tempo `rask` kaller `completeWait()` uten ventetid (`par_klokke` = virtuell). `sanntid` venter ITI og tilbakemelding. Standard er rask.
 
-Symbolsettet `abstrakte` er valgbart på oppsettet og er standard bare der. Menneskeøkter starter fortsatt på de innebygde figurene. Settet dekker A1–C3 (3 medlemmer, 2 eller 3 klasser). SEIAIA-PS krever 3×3.
+Symbolsettet `abstrakte` er valgbart på oppsettet og er standard bare i agentøkter. Menneskeøkter starter fortsatt på de innebygde figurene. Settet er tolv faste SVG-kurver, generert med seed `20261029` (`npm run stimuli:squiggles`) og sjekket inn. Det dekker A–C og klasse 1–4. SEIAIA-PS krever 3×3. `glyph` i protokollen er tom for dette settet, så agenten ikke får et tegnnavn. `symbol_id` er `k01`–`k12`.
 
 ## Protokoll `mts-agent/1`
 
@@ -53,7 +53,7 @@ Mofrad EPS/E-EPS og en LLM-bot er ikke med. De trenger Python eller en API-nøkk
 
 Mofrad-wrapperen bør ligge utenfor originalkoden og kalle `trial_preprocess`, `action_selection` og oppdateringen forsøk for forsøk. Læring skal bruke `previous.correct` og `previous.feedback_given`, ikke fasit. Nedtrappingen i MTS-lab (100/75/50/0, med forsøk uten tilbakemelding) er ikke den samme som Mofrads løp. Det må avklares før en wrapper skrives. Se kravdokumentets kapittel 7.
 
-LLM-wrapperen bygger teksten av `sample.glyph` og `comparisons[].glyph`, holder egen historikk (`none` / siste N / full) og legger nøkkelen bare på serversiden. Ingen nøkkel i frontend, `dist/` eller git. `notice` er `null` her. MTS-lab har ingen fasetekster av typen «PHASE CHANGE».
+LLM-wrapperen kan senere få bildet av krussedullen, ikke et tegnnavn. `glyph` er tom. Historikk er `none` / siste N / full i wrapperen, og nøkkelen ligger bare på serversiden. Ingen nøkkel i frontend, `dist/` eller git. `notice` er `null` her. MTS-lab har ingen fasetekster av typen «PHASE CHANGE».
 
 ## Forslag til Apps Script, ikke gjort
 
@@ -75,7 +75,7 @@ LLM-wrapperen bygger teksten av `sample.glyph` og `comparisons[].glyph`, holder 
 | `submit_` tar ikke egne agentfiler | Bekreftet. Spor ligger i xlsx og nedlasting. |
 | `LockService.waitLock(20000)` på alle handlinger | Bekreftet i `handle_`. |
 | Korreksjon i MTS-lab | Bekreftet i `decideNext`. Om SEIAIA-P-runneren har korreksjon, er fortsatt ukjent. Runneren ligger ikke i dette repoet. |
-| Symbolene fantes ikke | Bekreftet. Lagt inn som valgbart sett. |
+| Symbolene ◆▲● fantes ikke, og er tatt ut igjen | Krussedullene er generert og sjekket inn. Kontaktark i `docs/`. |
 | Mastery 17/18 i én blokk | Bekreftet i `criteria.ts` og `decideBlockEnd`. Ikke 16/18 over to blokker. |
 | `analyze_mts.py` tåler nye kolonner | Bekreftet. Skriptet leser navngitte kolonner. Enhetstesten kjører det på en agent-CSV. |
 | Lokal nettverkstillatelse i Chrome, Pyodide, Apps Script-kvoter | Ikke testet. HTTP-agent og Pyodide er ikke bygget. |

@@ -10,6 +10,7 @@
     "build:offline": "tsc --noEmit && vite build --mode offline",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "stimuli:squiggles": "node scripts/generate-squiggles.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

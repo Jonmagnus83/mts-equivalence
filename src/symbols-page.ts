@@ -20,7 +20,7 @@ export function mountSymbols(root: HTMLElement): () => void {
     root.innerHTML = `${shell('symboler')}
       <div class="page">
         <h2>Innebygde symboler</h2>
-        <p>Settet har ${SYMBOLS.length} abstrakte svart-hvite figurer. De er tegnet for ikke å ligne bokstaver, tall, piler, stjerner eller andre kjente tegn. Se gjennom dem og utelat dem som likevel gjør det. Valget lagres i oppsettet på denne maskinen. Et annet, valgbart sett er de ni tegnene ◆ ▲ ● ■ ◢ ◤ △ ○ □ (A1–C3). Det endrer ikke disse figurene. Standard for menneskeøkter er fortsatt dette settet.</p>
+        <p>Settet har ${SYMBOLS.length} abstrakte svart-hvite figurer. De er tegnet for ikke å ligne bokstaver, tall, piler, stjerner eller andre kjente tegn. Se gjennom dem og utelat dem som likevel gjør det. Valget lagres i oppsettet på denne maskinen. Et annet, valgbart sett er tolv faste krusseduller (åpne streker). Det endrer ikke disse figurene. Standard for menneskeøkter er fortsatt dette settet.</p>
         <div class="actions">
           <button type="button" class="solid" id="save-symbols">Lagre utvalget</button>
         </div>

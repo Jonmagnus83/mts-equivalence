@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { ABSTRACT_GLYPHS, stimulusMarkup } from '../src/abstract-symbols';
+import { designFitsAbstractSet, stimulusMarkup } from '../src/abstract-symbols';
 import { createAgentPlugin } from '../src/agents/builtin';
 import { runAgentSession } from '../src/agents/driver';
 import { agentModeAllowed } from '../src/agents/launch';
@@ -384,20 +384,23 @@ describe('agent driver', () => {
 });
 
 describe('stimulus set', () => {
-  it('keeps the built-in set as the human default and adds the nine glyphs beside it', () => {
+  it('keeps the built-in figures as the human default and uses squiggles only when chosen', () => {
     const human = defaultConfig();
     expect(human.stimulusSet).toBe('innebygd');
     expect(parseConfig({ studyId: 'eldre' }).stimulusSet).toBe('innebygd');
     expect(parseConfig({ studyId: 'eldre' }).symbolAssignment).toEqual(human.symbolAssignment);
-    expect(stimulusMarkup('A1', human)).toContain('<svg');
-    expect(stimulusMarkup('A1', human)).not.toContain('◆');
-    const glyphs = parseConfig({ stimulusSet: 'abstrakte' });
-    expect(stimulusMarkup('A1', glyphs)).toContain('◆');
-    expect(stimulusMarkup('B2', glyphs)).toContain('◢');
-    expect(stimulusMarkup('C3', glyphs)).toContain('□');
-    expect(ABSTRACT_GLYPHS).toEqual({
-      A1: '◆', A2: '▲', A3: '●', B1: '■', B2: '◢', B3: '◤', C1: '△', C2: '○', C3: '□',
-    });
+    const humanMark = stimulusMarkup('A1', human);
+    expect(humanMark).toContain('<svg');
+    expect(humanMark).not.toContain('stroke-width="5.5"');
+    const squiggles = parseConfig({ stimulusSet: 'abstrakte' });
+    const mark = stimulusMarkup('A1', squiggles);
+    expect(mark).toContain('<path');
+    expect(mark).toContain('fill="none"');
+    expect(mark).toContain('stroke-width="5.5"');
+    expect(mark).not.toMatch(/[◆▲●■◢◤△○□]/);
+    expect(designFitsAbstractSet(3, 3)).toBe(true);
+    expect(designFitsAbstractSet(4, 3)).toBe(true);
+    expect(designFitsAbstractSet(3, 4)).toBe(false);
     expect(agentModeAllowed('Boter-AI')).toBe(true);
     expect(agentModeAllowed('Mennesker')).toBe(false);
   });

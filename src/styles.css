@@ -381,7 +381,7 @@ button.ghost { background: #fff; color: #141414; }
   text-align: center;
 }
 
-.agent-board .glyph { font-size: 48px; width: 64px; height: 64px; }
+.agent-board svg.squiggle { width: 72px; height: 72px; display: block; }
 
 .agent-board .corner {
   width: 88px;

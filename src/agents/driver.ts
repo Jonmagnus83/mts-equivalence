@@ -1,4 +1,4 @@
-import { abstractGlyph } from '../abstract-symbols';
+import { squiggleFor } from '../abstract-symbols';
 import { feedbackWords, instructionText, wrongWord } from '../config';
 import { allStimulusIds } from '../relations';
 import { mulberry32 } from '../rng';
@@ -301,7 +301,11 @@ export async function runAgentSession(options: DriverOptions): Promise<AgentRunR
 function sessionStart(options: DriverOptions, runId: string, limits: { maxBlocks: number; maxTrials: number }): SessionStart {
   const stimuli: SessionStart['stimuli'] = {};
   for (const id of allStimulusIds(options.config.classes, options.config.members)) {
-    stimuli[id] = { glyph: abstractGlyph(id) ?? '', symbol_id: options.config.symbolAssignment[id] ?? '' };
+    const squiggle = options.config.stimulusSet === 'abstrakte' ? squiggleFor(id) : null;
+    stimuli[id] = {
+      glyph: '',
+      symbol_id: squiggle?.id ?? options.config.symbolAssignment[id] ?? '',
+    };
   }
   return {
     type: 'session_start',
@@ -343,12 +347,12 @@ function trialRequest(
     protocol: PROTOCOL,
     run_id: runId,
     trial_nr: trialNr,
-    sample: { id: programmed.sample, glyph: abstractGlyph(programmed.sample) ?? '' },
+    sample: { id: programmed.sample, glyph: '' },
     comparisons: slots.map((slot) => ({
       position: slot.position,
       corner: slot.corner,
       id: slot.stimulus,
-      glyph: abstractGlyph(slot.stimulus) ?? '',
+      glyph: '',
     })),
     notice: null,
     previous,
@@ -398,7 +402,7 @@ function liveFrom(
   return {
     trialNr: trial?.forsøk_nr ?? 0,
     sampleId: programmed.sample,
-    sampleGlyph: abstractGlyph(programmed.sample) ?? programmed.sample,
+    sampleGlyph: '',
     phase: programmed.phase,
     block: programmed.block,
     attempt: programmed.attempt,
@@ -415,7 +419,7 @@ function liveFrom(
       position: slot.position,
       corner: slot.corner,
       id: slot.stimulus,
-      glyph: abstractGlyph(slot.stimulus) ?? slot.stimulus,
+      glyph: '',
       chosen: position === slot.position,
       isCorrect: slot.stimulus === programmed.correct,
     })),
