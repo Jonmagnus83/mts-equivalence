@@ -1,4 +1,4 @@
-import { feedbackWords, wrongWord } from './config';
+import { feedbackShownMs, feedbackWords, wrongWord } from './config';
 import { meetsMastery } from './criteria';
 import { placementsToCell } from './export';
 import { assignPositions } from './positions';
@@ -6,7 +6,8 @@ import {
   generatePretestBlock,
   generateTestBlock,
   generateTrainingBlock,
-  introLabels,
+  runtimeStages,
+  type RuntimeStage,
 } from './trials';
 import type {
   Corner,
@@ -31,12 +32,6 @@ export type Screen =
 interface QueueItem extends PlannedTrial {
   isCorrection: boolean;
   programmedIndex: number;
-}
-
-interface StagePlan {
-  kind: 'pretest' | 'intro' | 'train' | 'test';
-  percent: number;
-  label: string | null;
 }
 
 type NextAction =
@@ -72,21 +67,6 @@ export interface PersistedSession {
   originElapsed: number;
 }
 
-function stagesFor(config: ExperimentConfig): StagePlan[] {
-  const stages: StagePlan[] = [];
-  if (config.testReflexivity && config.reflexivityAsPretest) {
-    stages.push({ kind: 'pretest', percent: 0, label: null });
-  }
-  for (const label of introLabels(config)) {
-    stages.push({ kind: 'intro', percent: 100, label });
-  }
-  for (const percent of config.thinning) {
-    stages.push({ kind: 'train', percent, label: null });
-  }
-  stages.push({ kind: 'test', percent: 0, label: null });
-  return stages;
-}
-
 /**
  * Runs one participant from the first observing response to the last test trial.
  * The UI supplies time and draws `screen`. Closing the tab cannot be blocked here;
@@ -101,7 +81,7 @@ export class Session {
   private started = false;
   private readonly origin: number;
   private tabSwitches = 0;
-  private stages: StagePlan[];
+  private stages: RuntimeStage[];
   private stageIndex = 0;
   private queue: QueueItem[] = [];
   private cursor = 0;
@@ -117,6 +97,11 @@ export class Session {
   private pausedMs = 0;
   private pauseStarted: number | null = null;
   private rtSample: number | '' = '';
+  private presentationMs = 0;
+  private sampleOffMs = 0;
+  private sampleOffMark: number | null = null;
+  private sampleOffPaused = 0;
+  private trialStartMs = 0;
   private pending: PendingWait | null = null;
   private nextAction: NextAction | null = null;
   private heldScreen: Screen | null = null;
@@ -135,7 +120,7 @@ export class Session {
   ) {
     this.startedAtUtc = startedAtUtc ?? new Date(now()).toISOString();
     this.origin = now();
-    this.stages = stagesFor(config);
+    this.stages = runtimeStages(config);
   }
 
   start(): void {
@@ -170,11 +155,15 @@ export class Session {
       return;
     }
     this.rtSample = Math.max(0, Math.round(this.now() - this.trialOnset - this.pausedMs));
+    this.presentationMs = this.rtSample;
     this.pausedMs = 0;
     if (this.config.mtsType === 'delayed' && this.config.delaySeconds > 0) {
+      this.sampleOffMark = this.now();
+      this.sampleOffPaused = 0;
       this.screen = { type: 'delay' };
       this.pending = { kind: 'delay', remaining: this.config.delaySeconds * 1000, started: this.now() };
     } else {
+      if (this.config.mtsType === 'delayed') this.sampleOffMark = this.now();
       this.showChoice();
     }
     this.onChange();
@@ -214,10 +203,14 @@ export class Session {
       rt_sammenligning_ms: rtChoice,
       iti_ms: Math.round(this.config.itiSeconds * 1000),
       forsinkelse_ms: this.config.mtsType === 'delayed' ? Math.round(this.config.delaySeconds * 1000) : 0,
+      utvalg_presentasjon_ms: this.presentationMs,
+      utvalg_av_ms: this.sampleOffMs,
       tomt_hjørne: trial.emptyCorner ?? '',
       s_pluss_hjørne: trial.sPlusCorner,
       korreksjonsforsøk: trial.isCorrection ? 1 : 0,
       fanebytter_hittil: this.tabSwitches,
+      start_ms: this.trialStartMs,
+      svar_ms: Math.max(0, Math.round(this.now() - this.origin)),
     });
     this.nextAction = this.decideNext(correct === 1, trial);
     const duration = this.feedbackDuration(word, correct === 1);
@@ -276,7 +269,9 @@ export class Session {
       this.inactivityEventIndex = null;
     }
     if (this.pauseStarted !== null) {
-      this.pausedMs += this.now() - this.pauseStarted;
+      const pausedFor = this.now() - this.pauseStarted;
+      this.pausedMs += pausedFor;
+      if (this.sampleOffMark !== null) this.sampleOffPaused += pausedFor;
       this.pauseStarted = null;
     }
     this.screen = this.heldScreen ?? { type: 'sample', stimulus: '' };
@@ -378,6 +373,11 @@ export class Session {
     this.sampleClicks = 0;
     this.pausedMs = 0;
     this.rtSample = '';
+    this.presentationMs = 0;
+    this.sampleOffMs = 0;
+    this.sampleOffMark = null;
+    this.sampleOffPaused = 0;
+    this.trialStartMs = Math.max(0, Math.round(this.now() - this.origin));
     this.trialOnset = this.now();
     if (this.observingClicks() <= 0 && this.config.mtsType === 'simultaneous') {
       this.rtSample = 0;
@@ -390,6 +390,10 @@ export class Session {
   private showChoice(): void {
     const trial = this.queue[this.cursor];
     if (!trial) return;
+    if (this.sampleOffMark !== null) {
+      this.sampleOffMs = Math.max(0, Math.round(this.now() - this.sampleOffMark - this.sampleOffPaused));
+      this.sampleOffMark = null;
+    }
     this.choiceOnset = this.now();
     this.pausedMs = 0;
     const showSample = this.config.mtsType === 'simultaneous';
@@ -412,9 +416,7 @@ export class Session {
   }
 
   private feedbackDuration(word: string, correct: boolean): number {
-    if (!word) return 0;
-    if (!correct && this.config.wrongFeedback === 'literature') return 2000;
-    return this.config.feedbackDurationMs;
+    return feedbackShownMs(this.config, correct, word);
   }
 
   private decideNext(correct: boolean, trial: QueueItem): NextAction {

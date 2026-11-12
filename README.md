@@ -53,9 +53,11 @@ Uten Apps Script virker bare **Start økt på denne maskinen**. Det er også vei
 
 ## Resultatfilene
 
-Filene heter `<deltakernummer>.xlsx` og `<deltakernummer>.csv`. Excel-filen har fanene Data, Parametere, Hendelser og Oppsummering. CSV-filen er Data-fanen med UTF-8 BOM og semikolon, slik at norsk Excel viser æ, ø og å og deler kolonnene. Parametrene ligger både i fanen Parametere og som `par_`-kolonner på hver rad. `<deltakernummer>_hendelser.csv` er hendelsesloggen.
+Nedlastingen heter `DMTS_<sekunder>_<deltakernummer>.xlsx` ved forsinket matching, og `SMTS_0_<deltakernummer>.xlsx` ved simultan. Samme stamme brukes på CSV-filen og på `<stamme>_hendelser.csv`. Excel-filen har fanene Data, Parametere, Hendelser og Oppsummering. CSV-filen er Data-fanen med UTF-8 BOM og semikolon, slik at norsk Excel viser æ, ø og å og deler kolonnene. Hele oppsettet, treningsrekkefølgen og manuset ligger i Parametere. Korte `par_`-verdier gjentas også på hver forsøksrad. Oppsummeringen har nøyaktighet og responser per minutt for hver blokk.
 
-Nedlastingen skjer alltid på deltakerens maskin. Opplasting til Drive kommer i tillegg når Apps Script er satt opp.
+På oppsettssiden kan eksportprofilen settes til gamle engelske kolonnenavn. Relasjonstypene forblir `baseline`, `symmetri`, `transitivitet`, `ekvivalens` og `refleksivitet`. Feltnavnene er kartlagt i [docs/resultatfil-felter.md](docs/resultatfil-felter.md). En syntetisk fil ligger i [docs/eksempel-resultatfil.xlsx](docs/eksempel-resultatfil.xlsx).
+
+Nedlastingen skjer alltid på deltakerens maskin. Opplasting til Drive kommer i tillegg når Apps Script er satt opp. Kopien i Drive heter fortsatt bare deltakernummeret, til Apps Script er oppdatert.
 
 ## Symboler
 
