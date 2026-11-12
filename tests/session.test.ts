@@ -175,4 +175,65 @@ describe('session', () => {
     expect(session.events.map((event) => event.hendelse)).toEqual(['hidden', 'visible', 'forsøk_på_lukking']);
     expect(session.events[1]?.varighet_ms).toBe(400);
   });
+
+  it('records sample presentation, sample-off and the programmed delay as separate numbers', () => {
+    const config = tinyConfig({ mtsType: 'delayed', delaySeconds: 2, itiSeconds: 0, feedbackDurationMs: 0 });
+    let clock = 1_000_000;
+    const session = new Session(config, 10440, mulberry32(3), () => clock);
+    session.start();
+    expect(session.screen.type).toBe('sample');
+    clock += 400;
+    session.clickSample();
+    expect(session.screen.type).toBe('delay');
+    clock += 500;
+    session.noteAway('hidden');
+    clock += 5_000;
+    session.noteBack('visible');
+    session.resume();
+    clock += 1_500;
+    session.completeWait();
+    expect(session.screen.type).toBe('choice');
+    clock += 600;
+    choose(session, true);
+    const trial = session.trials.at(-1);
+    expect(trial?.utvalg_presentasjon_ms).toBe(400);
+    expect(trial?.utvalg_av_ms).toBe(2_000);
+    expect(trial?.forsinkelse_ms).toBe(2_000);
+    expect(trial?.rt_utvalg_ms).toBe(400);
+    expect(trial?.rt_sammenligning_ms).toBe(600);
+    expect(trial?.start_ms).toBe(0);
+    expect(trial?.svar_ms).toBe(400 + 500 + 5_000 + 1_500 + 600);
+  });
+
+  it('writes zero sample-off and zero programmed delay for simultaneous matching', () => {
+    const config = tinyConfig({ mtsType: 'simultaneous', sampleClicks: 1, delaySeconds: 4 });
+    let clock = 5_000;
+    const session = new Session(config, 10441, mulberry32(3), () => clock);
+    session.start();
+    clock += 250;
+    session.clickSample();
+    expect(session.screen.type).toBe('choice');
+    clock += 100;
+    choose(session, true);
+    const trial = session.trials.at(-1);
+    expect(trial?.utvalg_presentasjon_ms).toBe(250);
+    expect(trial?.utvalg_av_ms).toBe(0);
+    expect(trial?.forsinkelse_ms).toBe(0);
+  });
+
+  it('records a zero sample presentation when sample and comparisons appear together', () => {
+    const config = tinyConfig({ mtsType: 'simultaneous', sampleClicks: 0 });
+    let clock = 8_000;
+    const session = new Session(config, 10442, mulberry32(3), () => clock);
+    session.start();
+    expect(session.screen.type).toBe('choice');
+    clock += 300;
+    choose(session, true);
+    const trial = session.trials.at(-1);
+    expect(trial?.utvalg_presentasjon_ms).toBe(0);
+    expect(trial?.utvalg_av_ms).toBe(0);
+    expect(trial?.forsinkelse_ms).toBe(0);
+    expect(trial?.rt_utvalg_ms).toBe(0);
+    expect(trial?.rt_sammenligning_ms).toBe(300);
+  });
 });

@@ -1,5 +1,12 @@
 import { allStimulusIds } from './relations';
-import type { ExperimentConfig, Language, StimulusMode, TrainingStructure, WrongFeedback } from './types';
+import type {
+  ExperimentConfig,
+  ExportProfile,
+  Language,
+  StimulusMode,
+  TrainingStructure,
+  WrongFeedback,
+} from './types';
 import { SYMBOLS } from './symbols';
 
 export const DEFAULT_INSTRUCTION_NO = `Du skal gjøre en oppgave på denne skjermen.
@@ -63,6 +70,7 @@ export function defaultConfig(): ExperimentConfig {
     symbolAssignment: {},
     customStimuli: {},
     excludedSymbols: [],
+    exportProfile: 'standard',
   };
   config.symbolAssignment = assignSymbols(config);
   return config;
@@ -158,6 +166,7 @@ export function parseConfig(raw: unknown): ExperimentConfig {
     excludedSymbols: Array.isArray(input.excludedSymbols)
       ? input.excludedSymbols.filter((id): id is string => typeof id === 'string')
       : [],
+    exportProfile: exportProfileOf(input.exportProfile),
   };
   if (config.pictureMember !== null && config.pictureMember >= config.members) {
     config.pictureMember = config.members - 1;
@@ -181,6 +190,21 @@ function stringList(value: unknown, fallback: string[]): string[] {
 function isStringRecord(value: unknown): value is Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   return Object.values(value).every((item) => typeof item === 'string');
+}
+
+export function exportProfileOf(value: unknown): ExportProfile {
+  return value === 'gamle_navn' ? 'gamle_navn' : 'standard';
+}
+
+/** How long a feedback word stays on screen. Empty word means no feedback. Literature errors use 2000 ms. */
+export function feedbackShownMs(
+  config: Pick<ExperimentConfig, 'wrongFeedback' | 'feedbackDurationMs'>,
+  correct: boolean,
+  word: string,
+): number {
+  if (!word) return 0;
+  if (!correct && config.wrongFeedback === 'literature') return 2000;
+  return config.feedbackDurationMs;
 }
 
 export function feedbackWords(config: ExperimentConfig): string[] {

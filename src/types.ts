@@ -13,6 +13,8 @@ export type Phase = 'forhåndstest' | 'trening' | 'test';
 export type PositionMode = 'constrained' | 'free';
 export type Language = 'no' | 'en';
 export type StimulusMode = 'builtin' | 'upload';
+/** `gamle_navn` renames trial columns to the English profile. Relation codes stay. */
+export type ExportProfile = 'standard' | 'gamle_navn';
 
 /** Four screen corners. øv/øh = upper left/right, nv/nh = lower left/right. */
 export const CORNERS = ['øv', 'øh', 'nv', 'nh'] as const;
@@ -66,6 +68,8 @@ export interface ExperimentConfig {
   /** data: URLs that override a cell (uploads or picture nodes). */
   customStimuli: Record<string, string>;
   excludedSymbols: string[];
+  /** Result-file column names. `standard` keeps the Norwegian headers. */
+  exportProfile: ExportProfile;
 }
 
 export interface Pair {
@@ -115,11 +119,26 @@ export interface TrialRecord {
   rt_utvalg_ms: number | '';
   rt_sammenligning_ms: number | '';
   iti_ms: number;
+  /** Programmed delay before comparisons. 0 when the session is simultaneous. */
   forsinkelse_ms: number;
+  /**
+   * Milliseconds the sample was on screen alone, before comparisons.
+   * 0 when sample and comparisons appear together.
+   */
+  utvalg_presentasjon_ms: number;
+  /**
+   * Measured milliseconds from sample offset to comparison onset, pauses excluded.
+   * 0 when the sample stays up (simultaneous).
+   */
+  utvalg_av_ms: number;
   tomt_hjørne: string;
   s_pluss_hjørne: string;
   korreksjonsforsøk: 0 | 1;
   fanebytter_hittil: number;
+  /** Trial onset, milliseconds from session start. */
+  start_ms: number;
+  /** Comparison response, milliseconds from session start. */
+  svar_ms: number;
 }
 
 export type SessionEventName =

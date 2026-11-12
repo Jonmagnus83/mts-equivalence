@@ -73,6 +73,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       delaySeconds: Number(value('delaySeconds')),
       itiSeconds: Number(value('itiSeconds')),
       sampleClicks: Number(value('sampleClicks')),
+      inactivityMinutes: Number(value('inactivityMinutes')),
       positionBalance: value('positionBalance') === 'free' ? 'free' : 'constrained',
       maxConsecutiveSPlus: Number(value('maxConsecutiveSPlus')),
       testSymmetry: checked('testSymmetry'),
@@ -85,6 +86,7 @@ export function mountExperimenter(root: HTMLElement): () => void {
       customStimuli: config.customStimuli,
       excludedSymbols: config.excludedSymbols,
       symbolAssignment: config.symbolAssignment,
+      exportProfile: value('exportProfile') === 'gamle_navn' ? 'gamle_navn' : 'standard',
     });
     config.symbolAssignment = assignSymbols(config);
     const pressed = root.querySelector<HTMLButtonElement>('.folder-toggle [aria-pressed="true"]');
@@ -324,6 +326,12 @@ export function mountExperimenter(root: HTMLElement): () => void {
           <div class="fields">
             ${field('studyId', 'Studie-ID / prosjektmappe', config.studyId)}
             ${field('groupCode', 'Gruppekode (valgfri, ingen persondata)', config.groupCode)}
+            <label class="field">Eksportprofil
+              <select id="exportProfile">
+                <option value="standard" ${config.exportProfile === 'gamle_navn' ? '' : 'selected'}>Standard, norske kolonnenavn</option>
+                <option value="gamle_navn" ${config.exportProfile === 'gamle_navn' ? 'selected' : ''}>Gamle engelske kolonnenavn</option>
+              </select>
+            </label>
             <label class="field">Språk for deltaker
               <select id="language">
                 <option value="no" ${config.language === 'no' ? 'selected' : ''}>Norsk</option>

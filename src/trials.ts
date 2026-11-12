@@ -9,7 +9,7 @@ import {
   stimulusId,
 } from './relations';
 import { shuffle } from './rng';
-import type { ExperimentConfig, Phase, PlannedTrial, RelationKind } from './types';
+import type { ExperimentConfig, Pair, Phase, PlannedTrial, RelationKind } from './types';
 
 export interface TrialDraft {
   phase: Phase;
@@ -23,6 +23,14 @@ export interface TrialDraft {
   introLabel: string | null;
 }
 
+function formatPairLabel(pair: Pair): string {
+  if (pair.sampleMember === pair.comparisonMember) {
+    const letter = pairLabel(pair).slice(0, 1);
+    return `${letter}=${letter}`;
+  }
+  return pairLabel(pair);
+}
+
 function expandPair(
   config: ExperimentConfig,
   phase: Phase,
@@ -32,10 +40,7 @@ function expandPair(
   thinningPercent: number,
   introLabel: string | null,
 ): TrialDraft[] {
-  const label =
-    sampleMember === comparisonMember
-      ? `${pairLabel({ sampleMember, comparisonMember: sampleMember }).slice(0, 1)}=${pairLabel({ sampleMember, comparisonMember }).slice(0, 1)}`
-      : pairLabel({ sampleMember, comparisonMember });
+  const label = formatPairLabel({ sampleMember, comparisonMember });
   const drafts: TrialDraft[] = [];
   for (let classIndex = 0; classIndex < config.classes; classIndex++) {
     const sample = stimulusId(sampleMember, classIndex);
@@ -71,14 +76,18 @@ export function baselineDrafts(config: ExperimentConfig, thinningPercent: number
   return drafts;
 }
 
-export function testDrafts(config: ExperimentConfig): TrialDraft[] {
+export function selectedTestKinds(config: ExperimentConfig): RelationKind[] {
   const kinds: RelationKind[] = [];
   if (config.testBaseline) kinds.push('baseline');
   if (config.testSymmetry) kinds.push('symmetri');
   if (config.testTransitivity) kinds.push('transitivitet');
   if (config.testEquivalence) kinds.push('ekvivalens');
   if (config.testReflexivity && !config.reflexivityAsPretest) kinds.push('refleksivitet');
-  return draftsForKinds(config, 'test', kinds, config.testMultiplier);
+  return kinds;
+}
+
+export function testDrafts(config: ExperimentConfig): TrialDraft[] {
+  return draftsForKinds(config, 'test', selectedTestKinds(config), config.testMultiplier);
 }
 
 export function reflexivityDrafts(config: ExperimentConfig): TrialDraft[] {
@@ -179,6 +188,107 @@ export function generatePretestBlock(config: ExperimentConfig, rng: () => number
 export function introLabels(config: ExperimentConfig): string[] {
   if (!config.serialIntroduction) return [];
   return baselinePairs(config.structure, config.members).map((pair) => pairLabel(pair));
+}
+
+export interface RuntimeStage {
+  kind: 'pretest' | 'intro' | 'train' | 'test';
+  percent: number;
+  label: string | null;
+}
+
+/** Block order the session actually runs. Intro and training repeat until mastery. */
+export function runtimeStages(config: ExperimentConfig): RuntimeStage[] {
+  const stages: RuntimeStage[] = [];
+  if (config.testReflexivity && config.reflexivityAsPretest) {
+    stages.push({ kind: 'pretest', percent: 0, label: null });
+  }
+  for (const label of introLabels(config)) {
+    stages.push({ kind: 'intro', percent: 100, label });
+  }
+  for (const percent of config.thinning) {
+    stages.push({ kind: 'train', percent, label: null });
+  }
+  stages.push({ kind: 'test', percent: 0, label: null });
+  return stages;
+}
+
+function labelsOfKind(config: ExperimentConfig, kind: RelationKind): string[] {
+  return pairsOfKind(config.structure, config.members, kind).map((pair) => formatPairLabel(pair));
+}
+
+function baselineLabels(config: ExperimentConfig): string[] {
+  return baselinePairs(config.structure, config.members).map((pair) => pairLabel(pair));
+}
+
+export interface ProtocolStage {
+  kind: RuntimeStage['kind'];
+  percent: number;
+  label: string | null;
+  relations: string[];
+}
+
+/** Planned relations in session order. Within a block the order is shuffled at runtime. */
+export function protocolStages(config: ExperimentConfig): ProtocolStage[] {
+  return runtimeStages(config).map((stage) => {
+    if (stage.kind === 'pretest') {
+      return { ...stage, relations: labelsOfKind(config, 'refleksivitet') };
+    }
+    if (stage.kind === 'intro') {
+      return { ...stage, relations: stage.label ? [stage.label] : [] };
+    }
+    if (stage.kind === 'train') {
+      return { ...stage, relations: baselineLabels(config) };
+    }
+    const relations: string[] = [];
+    for (const kind of selectedTestKinds(config)) relations.push(...labelsOfKind(config, kind));
+    return { ...stage, relations };
+  });
+}
+
+/** Compact training and test order, for the Parameters sheet. */
+export function trainingSequence(config: ExperimentConfig): string {
+  return protocolStages(config)
+    .map((stage) => {
+      const relations = stage.relations.join('+');
+      if (stage.kind === 'intro') return `${stage.label}@${stage.percent}`;
+      if (stage.kind === 'train') return `blandet:${relations}@${stage.percent}`;
+      if (stage.kind === 'pretest') return `forhåndstest:${relations}`;
+      return `test:${relations}`;
+    })
+    .join(' > ');
+}
+
+/**
+ * Whole planned protocol. This is the session script: relation order, mastery,
+ * and which blocks repeat. It is not the shuffled trial list from a given run.
+ */
+export function protocolScript(config: ExperimentConfig): string {
+  const lines = [
+    'begin experiment',
+    'experiment_type Match to sample',
+    `mts_type ${config.mtsType}`,
+    `delay_s ${config.mtsType === 'delayed' ? config.delaySeconds : 0}`,
+    `programmed_delay_s ${config.delaySeconds}`,
+    `mastery ${config.masteryNumerator}/${config.masteryDenominator}`,
+    `structure ${config.structure}`,
+    `classes ${config.classes}`,
+    `members ${config.members}`,
+    `trial_multiplier ${config.trialMultiplier}`,
+    `test_multiplier ${config.testMultiplier}`,
+    `serial_introduction ${config.serialIntroduction ? 'true' : 'false'}`,
+    `response_mode mouse_click`,
+    `training_sequence ${trainingSequence(config)}`,
+  ];
+  for (const stage of protocolStages(config)) {
+    const name = stage.kind === 'intro' ? `intro ${stage.label}` : stage.kind;
+    const percent = stage.kind === 'intro' || stage.kind === 'train' ? ` ${stage.percent}%` : '';
+    const repeat = stage.kind === 'intro' || stage.kind === 'train' ? ' repeat_until_mastery' : '';
+    lines.push(`block ${name}${percent}${repeat}: ${stage.relations.join(', ')}`);
+  }
+  lines.push('within_block_order shuffled');
+  lines.push('relation_codes baseline, symmetri, transitivitet, ekvivalens, refleksivitet');
+  lines.push('end experiment');
+  return lines.join('\n');
 }
 
 export interface BlockPlan {
